@@ -1,7 +1,14 @@
 name: flavorpilot
 description: A CLI tool that sets up and manages Flutter flavors in one place. Run, build, and release any flavor with a single short command.
 version: 0.1.0
-# repository: https://github.com/<your-user>/flavorpilot
+repository: https://github.com/ahmedtalal/flavor-pilot
+issue_tracker: https://github.com/ahmedtalal/flavor-pilot/issues
+topics:
+  - flutter
+  - flavors
+  - cli
+  - android
+  - ios
 
 environment:
   sdk: ^3.8.0

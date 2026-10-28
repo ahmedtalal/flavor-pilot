@@ -1,3 +1,12 @@
 # https://dart.dev/tools/private-files
 # Created by `dart pub`
 .dart_tool/
+
+# The test fixture only needs its few original project files. Flutter
+# generates the files below (some with local machine paths) when a tool runs
+# inside the fixture folder, so keep them out of git and the package.
+test/fixtures/flutter_app/pubspec.lock
+test/fixtures/flutter_app/android/local.properties
+test/fixtures/flutter_app/android/app/src/main/java/
+test/fixtures/flutter_app/ios/Flutter/
+test/fixtures/flutter_app/ios/Runner/GeneratedPluginRegistrant.*
