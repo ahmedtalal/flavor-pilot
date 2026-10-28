@@ -1,0 +1,28 @@
+# Example flavorpilot.yaml
+#
+# Put this file at the root of your Flutter project (next to pubspec.yaml).
+# `flavorpilot init` creates it for you; you can also write it by hand.
+
+# How the Dart entry point is organized:
+#   single   -> one lib/main.dart for all flavors (default)
+#   multiple -> one lib/main_<flavor>.dart per flavor
+main_mode: single
+
+# Each key is the flavor name passed to `flutter --flavor`.
+# It must start with a lowercase letter and contain only letters and digits.
+flavors:
+  development:
+    alias: dev                          # short name: `flavorpilot run dev`
+    app_name: "My App DEV"              # name on the device home screen
+    android_id: "com.example.myapp.dev" # Android applicationId
+    ios_bundle_id: "com.example.myapp.dev"
+  staging:
+    alias: stg
+    app_name: "My App STG"
+    android_id: "com.example.myapp.stg"
+    ios_bundle_id: "com.example.myapp.stg"
+  production:
+    alias: prod
+    app_name: "My App"
+    android_id: "com.example.myapp"
+    ios_bundle_id: "com.example.myapp"

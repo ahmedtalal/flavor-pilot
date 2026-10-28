@@ -1,0 +1,21 @@
+name: flavorpilot
+description: A CLI tool that sets up and manages Flutter flavors in one place. Run, build, and release any flavor with a single short command.
+version: 0.1.0
+# repository: https://github.com/<your-user>/flavorpilot
+
+environment:
+  sdk: ^3.8.0
+
+# Makes `flavorpilot` available as a terminal command after
+# `dart pub global activate flavorpilot`.
+executables:
+  flavorpilot: flavorpilot
+
+dependencies:
+  args: ^2.7.0
+  path: ^1.9.0
+  yaml: ^3.1.4
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.6
