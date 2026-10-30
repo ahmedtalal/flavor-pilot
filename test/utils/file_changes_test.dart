@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flavorpilot/src/utils/file_changes.dart';
 import 'package:path/path.dart' as p;
@@ -37,6 +38,33 @@ void main() {
 
     expect(File(p.join(dir, 'gen', 'old.txt')).existsSync(), isFalse);
     expect(readFile(dir, 'gen/new.txt'), 'fresh');
+  });
+
+  test('writes binary files without changing their bytes', () {
+    final dir = createEmptyDir();
+    final bytes = Uint8List.fromList([0, 255, 128, 10]);
+
+    FileChanges()
+      ..writeBytes(p.join(dir, 'x', 'a.bin'), bytes)
+      ..apply();
+
+    expect(File(p.join(dir, 'x', 'a.bin')).readAsBytesSync(), bytes);
+  });
+
+  test('deleting a file removes its folder only when it becomes empty', () {
+    final dir = createEmptyDir();
+    writeFile(dir, 'empty/a.txt', 'a');
+    writeFile(dir, 'kept/a.txt', 'a');
+    writeFile(dir, 'kept/b.txt', 'b');
+
+    FileChanges()
+      ..deleteFile(p.join(dir, 'empty', 'a.txt'))
+      ..deleteFile(p.join(dir, 'kept', 'a.txt'))
+      ..deleteFile(p.join(dir, 'missing', 'a.txt'))
+      ..apply();
+
+    expect(Directory(p.join(dir, 'empty')).existsSync(), isFalse);
+    expect(readFile(dir, 'kept/b.txt'), 'b');
   });
 
   test('keeps notes in order', () {

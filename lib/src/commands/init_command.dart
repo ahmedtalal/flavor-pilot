@@ -15,7 +15,7 @@ import 'flavorpilot_command.dart';
 ///
 /// Steps:
 /// 1. Asks a few questions (flavor names, aliases, app names, ids, and
-///    whether to use one main.dart or one per flavor).
+///    whether each flavor gets its own main file).
 /// 2. Saves the answers to `flavorpilot.yaml`.
 /// 3. Runs every generator to update Android, iOS, Dart and IDE files.
 ///
@@ -91,6 +91,26 @@ class InitCommand extends FlavorPilotCommand {
         'apply changes from it, or --force to start over.',
       );
     }
+    if (exists) _warnAboutLostSettings();
+  }
+
+  /// Warns that `--force` replaces env values and icons, which `init` doesn't
+  /// ask about.
+  void _warnAboutLostSettings() {
+    try {
+      final hasExtras = configLoader
+          .load(projectDir)
+          .flavors
+          .any((f) => f.env.isNotEmpty || f.icon != null);
+      if (hasExtras) {
+        logger.warn(
+          '--force replaces ${ConfigLoader.fileName}, so its env values and '
+          'icons will be lost.',
+        );
+      }
+    } on FlavorPilotException {
+      // The old file is broken, so there's nothing worth warning about.
+    }
   }
 
   /// Asks the setup questions and builds the config from the answers.
@@ -122,14 +142,14 @@ class InitCommand extends FlavorPilotCommand {
         questions.ask(name, baseName: baseName, baseId: baseId),
     ];
 
-    final singleMain = prompter.confirm(
-      'Use one main.dart for all flavors? (No = one main file per flavor)',
-      defaultValue: true,
+    final separateMains = prompter.confirm(
+      'Create a separate main file for each flavor?',
+      defaultValue: false,
     );
 
     return ProjectConfig(
       flavors: flavors,
-      mainMode: singleMain ? MainMode.single : MainMode.multiple,
+      mainMode: separateMains ? MainMode.multiple : MainMode.single,
     );
   }
 

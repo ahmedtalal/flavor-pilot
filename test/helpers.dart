@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flavorpilot/flavorpilot.dart';
 import 'package:flavorpilot/src/utils/logger.dart';
 import 'package:flavorpilot/src/utils/process_runner.dart';
+import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
@@ -48,10 +50,27 @@ void writeFile(String projectDir, String path, String content) {
 }
 
 /// Every file in [dir] with its content, used to prove nothing changed.
+/// Uses latin1 because it can read any bytes, including PNG files.
 Map<String, String> snapshot(String dir) => {
   for (final file in Directory(dir).listSync(recursive: true).whereType<File>())
-    p.relative(file.path, from: dir): file.readAsStringSync(),
+    p.relative(file.path, from: dir): latin1.decode(file.readAsBytesSync()),
 };
+
+/// Writes a [width]×[height] solid red PNG inside [projectDir].
+/// With [alpha] below 255 the image is partly transparent.
+void writePng(
+  String projectDir,
+  String path, {
+  int width = 1024,
+  int height = 1024,
+  int alpha = 255,
+}) {
+  final image = img.Image(width: width, height: height, numChannels: 4);
+  img.fill(image, color: img.ColorRgba8(255, 0, 0, alpha));
+  File(p.join(projectDir, path))
+    ..parent.createSync(recursive: true)
+    ..writeAsBytesSync(img.encodePng(image));
+}
 
 /// A [ProcessRunner] that records commands instead of running them.
 class FakeProcessRunner extends ProcessRunner {

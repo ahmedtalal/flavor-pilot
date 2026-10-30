@@ -99,6 +99,170 @@ flavors:
     });
   });
 
+  group('env', () {
+    /// A config with two flavors, each with the given `env` lines.
+    String withEnv(String dev, String prod) =>
+        '''
+flavors:
+  development:
+    env:
+      $dev
+  production:
+    env:
+      $prod
+''';
+
+    test('reads text, number and true/false values with their types', () {
+      final env = loader
+          .parse('''
+flavors:
+  development:
+    env:
+      base_url: "https://dev.example.com"
+      enable_logs: true
+      retries: 3
+      ratio: 0.5
+''')
+          .flavors
+          .single
+          .env;
+
+      expect(env, {
+        'base_url': 'https://dev.example.com',
+        'enable_logs': true,
+        'retries': 3,
+        'ratio': 0.5,
+      });
+    });
+
+    test('allows mixing whole and decimal numbers', () {
+      final config = loader.parse(withEnv('ratio: 1', 'ratio: 0.5'));
+      expect(config.flavors.first.env['ratio'], 1);
+    });
+
+    /// Expects [yaml] to be rejected with a message containing [message].
+    void expectRejected(String yaml, String message) {
+      expect(
+        () => loader.parse(yaml),
+        throwsA(
+          isA<FlavorPilotException>().having(
+            (e) => e.message,
+            'message',
+            contains(message),
+          ),
+        ),
+      );
+    }
+
+    test('rejects a key missing from another flavor', () {
+      expectRejected(
+        withEnv('base_url: "a"', 'other: "b"'),
+        'missing from: production',
+      );
+    });
+
+    test('rejects a flavor with no env when others have it', () {
+      expectRejected('''
+flavors:
+  development:
+    env:
+      base_url: "a"
+  production: {}
+''', 'missing from: production');
+    });
+
+    test('rejects different types across flavors', () {
+      expectRejected(
+        withEnv('value: "1"', 'value: 1'),
+        'different types across flavors',
+      );
+      expectRejected(
+        withEnv('value: true', 'value: "true"'),
+        'different types across flavors',
+      );
+    });
+
+    test('rejects invalid keys', () {
+      for (final key in ['baseUrl', 'base-url', '_url', 'a__b', 'url_']) {
+        expectRejected(withEnv('$key: "a"', '$key: "b"'), 'invalid env key');
+      }
+    });
+
+    test('rejects keys that would break the generated enum', () {
+      for (final key in ['name', 'app_name', 'index', 'class', 'to_string']) {
+        expectRejected(withEnv('$key: "a"', '$key: "b"'), 'is reserved');
+      }
+    });
+
+    test('rejects a key that clashes with a flavor name', () {
+      expectRejected(
+        withEnv('production: "a"', 'production: "b"'),
+        'clashes with the flavor',
+      );
+    });
+
+    test('rejects two keys that become the same field', () {
+      expectRejected('''
+flavors:
+  development:
+    env:
+      a_1: "x"
+      a1: "y"
+''', 'both become the field "a1"');
+    });
+
+    test('rejects nested, empty and infinite values', () {
+      expectRejected('''
+flavors:
+  development:
+    env:
+      nested: {a: 1}
+''', 'must be a text, number');
+      expectRejected('''
+flavors:
+  development:
+    env:
+      empty:
+''', 'must be a text, number');
+      expectRejected('''
+flavors:
+  development:
+    env:
+      big: .inf
+''', 'finite number');
+    });
+
+    test('rejects env that is not a map', () {
+      expectRejected('''
+flavors:
+  development:
+    env: "x"
+''', 'env must be a YAML map');
+    });
+  });
+
+  group('icon', () {
+    test('reads the icon path', () {
+      final config = loader.parse('''
+flavors:
+  development:
+    icon: assets/dev.png
+''');
+      expect(config.flavors.single.icon, 'assets/dev.png');
+    });
+
+    test('rejects an icon that is not a path', () {
+      expect(
+        () => loader.parse('''
+flavors:
+  development:
+    icon: 12
+'''),
+        throwsA(isA<FlavorPilotException>()),
+      );
+    });
+  });
+
   group('ConfigLoader.load', () {
     test('explains how to fix a missing file', () {
       expect(

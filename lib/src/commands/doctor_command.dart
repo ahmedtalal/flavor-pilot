@@ -1,9 +1,11 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
 
 import '../generators/project_setup.dart';
 import '../utils/exceptions.dart';
+import '../utils/file_changes.dart';
 import 'flavorpilot_command.dart';
 
 /// `flavorpilot doctor`: checks that every flavor is set up correctly.
@@ -40,9 +42,9 @@ class DoctorCommand extends FlavorPilotCommand {
     );
 
     final setup = ProjectSetup(projectDir: projectDir, logger: logger);
-    final Map<String, String> expected;
+    final FileChanges expected;
     try {
-      expected = setup.plan(config).writes;
+      expected = setup.plan(config);
     } on FlavorPilotException catch (e) {
       // A generator refused to plan, e.g. because of hand-made flavors.
       logger.error(e.message);
@@ -50,8 +52,14 @@ class DoctorCommand extends FlavorPilotCommand {
     }
 
     final outdated = [
-      for (final MapEntry(key: path, value: content) in expected.entries)
+      for (final MapEntry(key: path, value: content) in expected.writes.entries)
         if (!_matches(path, content)) p.relative(path, from: projectDir),
+      for (final MapEntry(key: path, value: bytes)
+          in expected.binaryWrites.entries)
+        if (!_matchesBytes(path, bytes)) p.relative(path, from: projectDir),
+      // Files that should be gone, like icons of a flavor that dropped `icon`.
+      for (final path in expected.deletedFiles)
+        if (File(path).existsSync()) p.relative(path, from: projectDir),
     ];
 
     if (outdated.isEmpty) {
@@ -79,6 +87,18 @@ class DoctorCommand extends FlavorPilotCommand {
       return _maskIds(actual) == _maskIds(expected);
     }
     return actual == expected;
+  }
+
+  /// True when the file at [path] already has the [expected] bytes.
+  bool _matchesBytes(String path, Uint8List expected) {
+    final file = File(path);
+    if (!file.existsSync()) return false;
+    final actual = file.readAsBytesSync();
+    if (actual.length != expected.length) return false;
+    for (var i = 0; i < actual.length; i++) {
+      if (actual[i] != expected[i]) return false;
+    }
+    return true;
   }
 
   String _maskIds(String text) => text.replaceAll(_xcodeId, 'ID');

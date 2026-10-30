@@ -77,6 +77,8 @@ class AddCommand extends FlavorPilotCommand {
     // Base the defaults on production when it exists, so a new flavor's id
     // looks like its siblings (e.g. com.example.app.qa).
     final production = config.findFlavor('production');
+    // Every flavor needs the same env keys, so suggest an existing flavor's.
+    final envSource = production ?? config.flavors.first;
     final flavor = questions.ask(
       rest.single,
       baseName: production?.appName ?? questions.defaultAppName(),
@@ -84,6 +86,7 @@ class AddCommand extends FlavorPilotCommand {
       alias: argResults!.option('alias'),
       appName: argResults!.option('app-name'),
       appId: argResults!.option('app-id'),
+      envDefaults: envSource.env,
     );
 
     final updated = ProjectConfig(
@@ -98,6 +101,12 @@ class AddCommand extends FlavorPilotCommand {
     ).apply(updated, saveConfig: true);
 
     logger.success('Added flavor "${flavor.name}".');
+    if (argResults!.flag('yes') && envSource.env.isNotEmpty) {
+      logger.warn(
+        '"${flavor.name}" copied its env values from "${envSource.name}". '
+        'Update them in flavorpilot.yaml, then run `flavorpilot sync`.',
+      );
+    }
     return 0;
   }
 }

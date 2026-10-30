@@ -8,6 +8,7 @@ import '../utils/logger.dart';
 import 'android_generator.dart';
 import 'dart_generator.dart';
 import 'generator.dart';
+import 'icon_generator.dart';
 import 'ide_generator.dart';
 import 'ios_generator.dart';
 
@@ -26,6 +27,7 @@ class ProjectSetup {
   List<Generator> get generators => [
     AndroidGenerator(projectDir: projectDir, logger: logger),
     IosGenerator(projectDir: projectDir, logger: logger),
+    IconGenerator(projectDir: projectDir, logger: logger),
     DartGenerator(projectDir: projectDir, logger: logger),
     IdeGenerator(projectDir: projectDir, logger: logger),
   ];

@@ -16,13 +16,26 @@ flavors:
     app_name: "My App DEV"              # name on the device home screen
     android_id: "com.example.myapp.dev" # Android applicationId
     ios_bundle_id: "com.example.myapp.dev"
+    icon: "assets/icons/dev.png"        # optional: square PNG, 1024×1024 or more
+    # Optional settings, available in the app as AppFlavor.current.baseUrl
+    # and AppFlavor.current.enableLogs. Every flavor needs the same keys.
+    # These values are stored in the app and in git, so never put secrets here.
+    env:
+      base_url: "https://dev.api.example.com"
+      enable_logs: true
   staging:
     alias: stg
     app_name: "My App STG"
     android_id: "com.example.myapp.stg"
     ios_bundle_id: "com.example.myapp.stg"
+    env:
+      base_url: "https://staging.api.example.com"
+      enable_logs: true
   production:
     alias: prod
     app_name: "My App"
     android_id: "com.example.myapp"
     ios_bundle_id: "com.example.myapp"
+    env:
+      base_url: "https://api.example.com"
+      enable_logs: false

@@ -5,6 +5,7 @@ import 'package:yaml/yaml.dart';
 
 import '../generators/android_generator.dart';
 import '../models/flavor.dart';
+import 'exceptions.dart';
 import 'prompter.dart';
 
 /// The questions asked about a flavor, and their default answers.
@@ -38,6 +39,9 @@ class FlavorQuestions {
   ///
   /// A value passed in [alias], [appName] or [appId] (from command-line
   /// options) is used as-is and its question is skipped.
+  ///
+  /// [envDefaults] holds the env keys the flavor needs and their suggested
+  /// values, taken from an existing flavor.
   Flavor ask(
     String name, {
     required String baseName,
@@ -45,6 +49,7 @@ class FlavorQuestions {
     String? alias,
     String? appName,
     String? appId,
+    Map<String, Object> envDefaults = const {},
   }) {
     final isProduction = name == 'production';
     alias ??= prompter.ask(
@@ -69,7 +74,34 @@ class FlavorQuestions {
       appName: appName,
       androidId: appId,
       iosBundleId: appId,
+      env: {
+        for (final MapEntry(:key, :value) in envDefaults.entries)
+          key: _askEnvValue(name, key, value),
+      },
     );
+  }
+
+  /// Asks for one env value and converts the answer to the type of [suggested].
+  Object _askEnvValue(String flavor, String key, Object suggested) {
+    final answer = prompter.ask(
+      '  [$flavor] env $key',
+      defaultValue: '$suggested',
+    );
+    return switch (suggested) {
+      String() => answer,
+      bool() => switch (answer) {
+        'true' => true,
+        'false' => false,
+        _ => throw FlavorPilotException(
+          'env key "$key" must be true or false, not "$answer".',
+        ),
+      },
+      _ =>
+        num.tryParse(answer) ??
+            (throw FlavorPilotException(
+              'env key "$key" must be a number, not "$answer".',
+            )),
+    };
   }
 
   /// Default app name: the `name:` from pubspec.yaml with a capital first

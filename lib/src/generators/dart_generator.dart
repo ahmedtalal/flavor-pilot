@@ -4,13 +4,15 @@ import 'package:path/path.dart' as p;
 
 import '../models/main_mode.dart';
 import '../models/project_config.dart';
+import '../utils/env_fields.dart';
 import '../utils/file_changes.dart';
 import 'generator.dart';
 
 /// Creates the Dart side of the flavors.
 ///
 /// - Always writes `lib/flavors.dart`: an `AppFlavor` enum the app uses to
-///   know which flavor it's running, e.g. `AppFlavor.current.appName`.
+///   know which flavor it's running, e.g. `AppFlavor.current.appName`. Each
+///   `env` key becomes a field, e.g. `AppFlavor.current.baseUrl`.
 /// - In [MainMode.multiple], also creates `lib/main_<flavor>.dart` for every
 ///   flavor that doesn't have one yet.
 ///
@@ -46,9 +48,31 @@ class DartGenerator extends Generator {
       return;
     }
 
+    // Every flavor has the same env keys (ConfigLoader checks this), so the
+    // first flavor gives the list of fields.
+    final envKeys = config.flavors.first.env.keys;
     final values = config.flavors
-        .map((f) => "  ${f.name}(appName: '${_escape(f.appName ?? f.name)}')")
+        .map((f) {
+          final args = [
+            "appName: '${_escape(f.appName ?? f.name)}'",
+            for (final key in envKeys)
+              '${envFieldName(key)}: ${_literal(f.env[key]!)}',
+          ];
+          return '  ${f.name}(${args.join(', ')})';
+        })
         .join(',\n');
+    final parameters = [
+      'required this.appName',
+      for (final key in envKeys) 'required this.${envFieldName(key)}',
+    ].join(', ');
+    final fields = StringBuffer();
+    for (final key in envKeys) {
+      final type = envDartType(config.flavors.map((f) => f.env[key]!));
+      fields
+        ..writeln()
+        ..writeln('  /// `$key` from flavorpilot.yaml.')
+        ..writeln('  final $type ${envFieldName(key)};');
+    }
 
     changes.write(file.path, '''
 $generatedHeader
@@ -58,11 +82,11 @@ import 'package:flutter/services.dart';
 enum AppFlavor {
 $values;
 
-  const AppFlavor({required this.appName});
+  const AppFlavor({$parameters});
 
   /// App name for this flavor.
   final String appName;
-
+$fields
   /// The flavor the app is running with, taken from `flutter run --flavor`.
   static AppFlavor get current {
     final name = appFlavor;
@@ -104,9 +128,15 @@ void main() {
     }
   }
 
+  /// Writes an env [value] as Dart source code.
+  String _literal(Object value) =>
+      value is String ? "'${_escape(value)}'" : '$value';
+
   /// Escapes characters that are special inside single-quoted Dart strings.
   String _escape(String value) => value
       .replaceAll(r'\', r'\\')
       .replaceAll("'", r"\'")
-      .replaceAll(r'$', r'\$');
+      .replaceAll(r'$', r'\$')
+      .replaceAll('\n', r'\n')
+      .replaceAll('\r', r'\r');
 }

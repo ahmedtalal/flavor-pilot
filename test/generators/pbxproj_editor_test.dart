@@ -114,6 +114,34 @@ void main() {
     }
   });
 
+  test('points only the flavor with an icon to its own icon set', () {
+    const withIcon = [
+      Flavor(name: 'development', icon: 'assets/dev.png'),
+      Flavor(name: 'production'),
+    ];
+    final text = (PbxprojEditor(
+      original,
+      random: Random(1),
+    )..addFlavors(withIcon, defaultAppName: 'Sample')).text;
+
+    // Debug, Release and Profile of the Runner target only.
+    expect(
+      count(
+        text,
+        'ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-development";',
+      ),
+      3,
+    );
+    expect(text, isNot(contains('AppIcon-production')));
+    for (final entry in configEntries(text)) {
+      expect(
+        count(entry, 'ASSETCATALOG_COMPILER_APPICON_NAME'),
+        lessThanOrEqualTo(1),
+        reason: entry,
+      );
+    }
+  });
+
   test('every configuration has at most one FLAVOR_APP_NAME', () {
     // Regression: re-running copied the base's app name into flavor configs.
     final text = generate(generate(original, seed: 1), seed: 2);

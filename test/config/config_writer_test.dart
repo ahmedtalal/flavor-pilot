@@ -28,6 +28,25 @@ void main() {
     expect(loaded.flavors.last.toMap(), isEmpty);
   });
 
+  test('env values and icons load back with the same types', () {
+    const env = <String, Object>{
+      'base_url': 'https://example.com/a#b: "c"',
+      'multi_line': 'one\ntwo',
+      'enable_logs': false,
+      'retries': 3,
+      'ratio': 1.5,
+    };
+    final yaml = writer.toYaml(
+      const ProjectConfig(
+        flavors: [Flavor(name: 'beta', icon: 'assets/beta.png', env: env)],
+      ),
+    );
+
+    final loaded = loader.parse(yaml).flavors.single;
+    expect(loaded.env, env);
+    expect(loaded.icon, 'assets/beta.png');
+  });
+
   test('app names with YAML special characters survive', () {
     const name = r'My: App #1 "Beta" \ test';
     final yaml = writer.toYaml(

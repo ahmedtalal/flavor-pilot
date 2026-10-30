@@ -28,6 +28,8 @@ flavorpilot build prod --target appbundle
 - [Getting started, step by step](#getting-started-step-by-step)
 - [What `init` changes in your project](#what-init-changes-in-your-project)
 - [Commands](#commands)
+- [Settings per flavor: `env`](#settings-per-flavor-env)
+- [Icons per flavor](#icons-per-flavor)
 - [The `flavorpilot.yaml` file](#the-flavorpilotyaml-file)
 - [Common tasks](#common-tasks)
 - [Safety: what flavorpilot will and won't do](#safety-what-flavorpilot-will-and-wont-do)
@@ -108,7 +110,7 @@ Flavors (comma separated) [development,staging,production]:
   [development] app id [com.example.my_app.dev]:
   [staging] short alias [stg]:
   ...
-Use one main.dart for all flavors? (No = one main file per flavor) (Y/n):
+Create a separate main file for each flavor? (y/N):
 ```
 
 | Question | What it means |
@@ -118,7 +120,7 @@ Use one main.dart for all flavors? (No = one main file per flavor) (Y/n):
 | Flavors | The flavor names, separated by commas. |
 | short alias | A short name you'll type in commands, e.g. `dev` in `flavorpilot run dev`. |
 | app name / app id | The name and id for that flavor. `production` keeps the base values. |
-| One main.dart? | **Yes** (recommended): one `lib/main.dart` for all flavors. **No**: one `lib/main_<flavor>.dart` per flavor, useful when each flavor needs different startup code (for example a separate Firebase project). |
+| Separate main file? | **No** (recommended, the default): one `lib/main.dart` for all flavors. **Yes**: one `lib/main_<flavor>.dart` per flavor, useful when each flavor needs different startup code (for example a separate Firebase project). |
 
 > Want to skip the questions? `flavorpilot init --yes` uses every default.
 
@@ -155,16 +157,16 @@ import 'flavors.dart';
 void main() {
   final flavor = AppFlavor.current; // e.g. AppFlavor.development
 
-  final baseUrl = switch (flavor) {
-    AppFlavor.development => 'https://dev.api.example.com',
-    AppFlavor.staging => 'https://staging.api.example.com',
-    AppFlavor.production => 'https://api.example.com',
-  };
-
-  print('Running ${flavor.appName} against $baseUrl');
+  print('Running ${flavor.appName}');
+  if (flavor == AppFlavor.development) {
+    // Something only for development.
+  }
   // runApp(...);
 }
 ```
+
+Need a different base URL or other settings per flavor? See
+[Settings per flavor](#settings-per-flavor-env).
 
 > `AppFlavor.current` only works when the app was started with a flavor
 > (through flavorpilot, `flutter run --flavor …`, or the IDE run
@@ -204,12 +206,15 @@ Every change is listed here, so nothing is a surprise.
 | iOS | `ios/Flutter/flavorpilot/*.xcconfig` | **Created.** One per configuration, so CocoaPods settings load correctly. |
 | iOS | `ios/Runner/Info.plist` | Sets the display name to `$(FLAVOR_APP_NAME)`. |
 | iOS | `ios/Podfile` (if it exists) | Maps each new configuration to `:debug` or `:release` between `# flavorpilot:start` / `# flavorpilot:end`. |
-| Dart | `lib/flavors.dart` | **Created.** The `AppFlavor` enum. |
+| Dart | `lib/flavors.dart` | **Created.** The `AppFlavor` enum, with a field for each [`env`](#settings-per-flavor-env) key. |
 | Dart | `lib/main_<flavor>.dart` | **Created** only if you chose one main file per flavor. Existing files are kept. |
 | IDE | `.vscode/launch.json` | Adds entries named `<flavor> (flavorpilot)`. Your own entries are kept. |
 | IDE | `.run/<flavor>.run.xml` | **Created.** Android Studio run configurations. |
 
 `lib/main.dart` is **never** changed.
+
+`env` and `icon` aren't part of the `init` questions: add them to
+`flavorpilot.yaml` afterwards and run `flavorpilot sync`.
 
 ## Commands
 
@@ -237,7 +242,7 @@ platform. Use it **once per project**.
 | Option | Meaning |
 | --- | --- |
 | `-y`, `--yes` | Skip the questions and use the defaults. |
-| `--force` | Start over even if `flavorpilot.yaml` exists. Your answers replace the old file. |
+| `--force` | Start over even if `flavorpilot.yaml` exists. Your answers replace the old file, so its `env` values and icons are lost (it warns you first). |
 
 ### `run`: run a flavor
 
@@ -332,6 +337,13 @@ flavorpilot add qualityAssurance --yes
 flavorpilot add uat --alias u --app-name "My App UAT" --app-id com.example.app.uat
 ```
 
+If your flavors use `env`, it also asks for each value. The suggested value
+comes from `production` (or your first flavor). With `--yes` those values are
+copied as they are and a warning reminds you to change them, so **update the
+new flavor's `base_url` before using it**.
+
+> `add` rewrites `flavorpilot.yaml`, so comments you wrote in it are removed.
+
 ### `sync`: apply changes from `flavorpilot.yaml`
 
 ```sh
@@ -357,6 +369,97 @@ on disk. It lists any file that is missing or out of date.
 - Exit code `1`: something needs fixing; usually `flavorpilot sync` fixes it.
 
 Handy in CI to catch a forgotten `sync`.
+
+## Settings per flavor: `env`
+
+Use `env` for values that differ between flavors, like a base URL or a logging
+switch.
+
+**1. Add them to `flavorpilot.yaml`:**
+
+```yaml
+flavors:
+  development:
+    alias: dev
+    env:
+      base_url: "https://dev.api.example.com"
+      enable_logs: true
+      timeout_seconds: 60
+  production:
+    alias: prod
+    env:
+      base_url: "https://api.example.com"
+      enable_logs: false
+      timeout_seconds: 30
+```
+
+**2. Apply them:**
+
+```sh
+flavorpilot sync
+```
+
+**3. Use them in your app.** Each key becomes a field on `AppFlavor`, with its
+type:
+
+```dart
+import 'flavors.dart';
+
+final dio = Dio(BaseOptions(baseUrl: AppFlavor.current.baseUrl));
+
+if (AppFlavor.current.enableLogs) {
+  // ...
+}
+```
+
+Rules, checked before any file changes:
+
+- **Every flavor needs the same keys.** A missing key is an error, so you find
+  out now and not when the app crashes.
+- **Each key keeps one type across flavors:** text, number or `true`/`false`.
+  Whole and decimal numbers can be mixed, and the field becomes `double`.
+- **Keys are `snake_case`**, like `base_url`. Names `AppFlavor` already uses,
+  like `name` or `app_name`, and Dart keywords, like `class`, aren't allowed.
+
+> ⚠️ **Never put secrets in `env`** (passwords, private API keys). These values
+> are stored in `flavorpilot.yaml` in your Git repository and inside the built
+> app, where anyone can extract them.
+
+## Icons per flavor
+
+Give a flavor its own icon so you can tell the builds apart on your device.
+
+**1. Add `icon` to the flavor in `flavorpilot.yaml`.** The path is relative to
+the project root:
+
+```yaml
+flavors:
+  development:
+    alias: dev
+    icon: "assets/icons/dev.png"
+```
+
+The image must be a **PNG**, **square**, and at least **1024×1024**.
+
+**2. Apply it:**
+
+```sh
+flavorpilot sync
+```
+
+| Platform | What it creates |
+| --- | --- |
+| Android | Five sizes in `android/app/src/<flavor>/res/mipmap-*`, using the icon name from your manifest. |
+| iOS | `ios/Runner/Assets.xcassets/AppIcon-<flavor>.appiconset`, used by that flavor's build configurations. Transparent areas become white, because Apple rejects transparency in app icons. |
+
+A flavor without `icon` keeps the project's current icon. If you remove `icon`
+and run `sync`, the icons flavorpilot created are deleted.
+
+- **Adaptive icons:** if your project has an adaptive icon in
+  `android/app/src/main/res/mipmap-anydpi-v26`, it can hide the flavor icon on
+  Android 8 and newer. flavorpilot warns you when this applies.
+- **Your own icons are safe:** if a flavor already has hand-made icons in those
+  locations, flavorpilot stops instead of replacing them.
 
 ## The `flavorpilot.yaml` file
 
@@ -387,6 +490,8 @@ flavors:
 | `app_name` | No | Name on the device. Defaults to the flavor name. |
 | `android_id` | No | Android `applicationId`. Defaults to the project's own id. |
 | `ios_bundle_id` | No | iOS bundle identifier. Defaults to the project's own id. |
+| `icon` | No | Path to the flavor's icon. See [Icons per flavor](#icons-per-flavor). |
+| `env` | No | Custom settings for the flavor. See [Settings per flavor](#settings-per-flavor-env). |
 
 Rules: flavor names start with a lowercase letter and contain only letters
 and digits; no name or alias can appear twice. See
@@ -406,6 +511,8 @@ and digits; no name or alias can appear twice. See
 3. Delete what `sync` doesn't remove on purpose (they may contain your own
    changes): `ios/Runner.xcodeproj/xcshareddata/xcschemes/<flavor>.xcscheme`,
    `.run/<flavor>.run.xml` and, in multiple mode, `lib/main_<flavor>.dart`.
+   If the flavor had an icon, also delete `android/app/src/<flavor>` and
+   `ios/Runner/Assets.xcassets/AppIcon-<flavor>.appiconset`.
 
 ### Added your first CocoaPods plugin after `init`
 
@@ -455,9 +562,9 @@ Run `git clean -nd` first to see what it would remove.
 - **All or nothing.** Every change is worked out in memory first. If any step
   fails, flavorpilot stops and **no file is written**.
 - **Never overwrites your own setup.** It stops instead when it finds
-  `productFlavors` or Xcode flavor configurations it didn't create. It never
-  replaces an existing scheme, a hand-written `lib/flavors.dart`, or an
-  existing `lib/main_<flavor>.dart`.
+  `productFlavors`, Xcode flavor configurations or flavor icons it didn't
+  create. It never replaces an existing scheme, a hand-written
+  `lib/flavors.dart`, or an existing `lib/main_<flavor>.dart`.
 - **Never touches `lib/main.dart`.**
 - **Marks what it owns.** Its blocks are wrapped in `flavorpilot:start` /
   `flavorpilot:end` comments, and its Xcode configurations carry a
@@ -483,6 +590,11 @@ Don't edit the marked blocks by hand: `sync` will replace them. Change
 | `.vscode/launch.json has comments or invalid JSON` (warning) | flavorpilot can't safely edit a launch.json with comments, so it skips it. Remove the comments and run `flavorpilot sync`, or add the entries yourself. |
 | `lib/flavors.dart already exists and was not created by flavorpilot` (warning) | You have your own `flavors.dart`; it was left alone. Rename yours to use the generated `AppFlavor`. |
 | `Unsupported version "…" in pubspec.yaml` | `release` needs a version like `1.2.3+4` in `pubspec.yaml`. |
+| `env key "…" is missing from: …` | Every flavor needs the same `env` keys. Add the key to the flavors listed. |
+| `env key "…" has different types across flavors` | Use the same type in every flavor. Check for a number or `true` written in quotes. |
+| `Flavor "…": icon "…" was not found` | Fix the path in `flavorpilot.yaml`. It's relative to the project root. |
+| `Flavor "…": icon "…" is …×…` | The icon must be square and at least 1024×1024. |
+| `… already has … icons that were not created by flavorpilot` | The flavor has hand-made icons. Delete them, or remove `icon` from the flavor. |
 | App throws `Unknown flavor "null"` at startup | The app was started without a flavor. Use `flavorpilot run <flavor>` or one of the IDE run configurations. |
 | `doctor` lists files as out of date | A file was edited by hand or `flavorpilot.yaml` changed. Run `flavorpilot sync`, then review with `git diff`. |
 | iOS build can't find Pods settings | Run `cd ios && pod install`. If `ios/Podfile` was created after `init`, run `flavorpilot sync` first. |

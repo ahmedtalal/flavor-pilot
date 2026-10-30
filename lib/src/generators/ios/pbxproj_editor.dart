@@ -11,6 +11,7 @@ import '../../utils/exceptions.dart';
 /// (Debug, Release, Profile) with:
 /// - `PRODUCT_BUNDLE_IDENTIFIER` set to the flavor's iOS bundle id,
 /// - `FLAVOR_APP_NAME` set to the flavor's app name (Info.plist reads it),
+/// - `ASSETCATALOG_COMPILER_APPICON_NAME` set to its own icon, if it has one,
 /// - its own `.xcconfig` file, so CocoaPods can link per configuration,
 /// - a `FLAVORPILOT = YES` marker, so the next run can find and replace it.
 ///
@@ -42,6 +43,10 @@ class PbxprojEditor {
   /// The build configuration name Flutter looks for, e.g. `Debug-development`.
   static String configName(String kind, Flavor flavor) =>
       '$kind-${flavor.name}';
+
+  /// The name of the flavor's icon in the asset catalog, e.g.
+  /// `AppIcon-development`.
+  static String iconSetName(Flavor flavor) => 'AppIcon-${flavor.name}';
 
   /// One `XCBuildConfiguration` object, from its id line to its closing `};`.
   ///
@@ -220,6 +225,23 @@ class PbxprojEditor {
         );
 
     if (!isApp) return entry;
+
+    if (flavor.icon != null) {
+      entry = entry
+          .replaceAll(
+            RegExp(
+              r'^\t\t\t\tASSETCATALOG_COMPILER_APPICON_NAME = .*;\n',
+              multiLine: true,
+            ),
+            '',
+          )
+          .replaceFirst(
+            '\t\t\tbuildSettings = {\n',
+            '\t\t\tbuildSettings = {\n'
+                '\t\t\t\tASSETCATALOG_COMPILER_APPICON_NAME = '
+                '${_quote(iconSetName(flavor))};\n',
+          );
+    }
 
     if (flavor.iosBundleId != null) {
       entry = entry.replaceFirst(

@@ -6,6 +6,7 @@ import 'package:yaml/yaml.dart';
 import '../models/flavor.dart';
 import '../models/main_mode.dart';
 import '../models/project_config.dart';
+import '../utils/env_fields.dart';
 import '../utils/exceptions.dart';
 
 /// Reads and validates `flavorpilot.yaml`.
@@ -33,6 +34,20 @@ class ConfigLoader {
   /// Flutter/Android flavor names must start with a lowercase letter and
   /// contain only letters and digits (Gradle rejects `-`, spaces, etc.).
   static final _validName = RegExp(r'^[a-z][a-zA-Z0-9]*$');
+
+  /// Env keys are snake_case, so they convert cleanly to Dart field names.
+  static final _validEnvKey = RegExp(r'^[a-z][a-z0-9]*(_[a-z0-9]+)*$');
+
+  /// Names an env key can't turn into: existing `AppFlavor` members and Dart
+  /// reserved words.
+  static const _reservedEnvFields = {
+    'appName', 'current', 'hashCode', 'index', 'name', 'noSuchMethod',
+    'runtimeType', 'toString', 'values', //
+    'assert', 'break', 'case', 'catch', 'class', 'const', 'continue',
+    'default', 'do', 'else', 'enum', 'extends', 'false', 'final', 'finally',
+    'for', 'if', 'in', 'is', 'new', 'null', 'rethrow', 'return', 'super',
+    'switch', 'this', 'throw', 'true', 'try', 'var', 'void', 'while', 'with',
+  };
 
   /// Loads the config file from [projectDir].
   ///
@@ -65,6 +80,7 @@ class ConfigLoader {
     final mainMode = _parseMainMode(root['main_mode']);
     final flavors = _parseFlavors(root['flavors']);
     _checkUniqueNames(flavors);
+    _checkEnvMatches(flavors);
 
     return ProjectConfig(flavors: flavors, mainMode: mainMode);
   }
@@ -105,9 +121,91 @@ class ConfigLoader {
       if (data is! Map) {
         throw FlavorPilotException('Flavor "$name" must be a YAML map.');
       }
+      _checkEnvShape(name, data['env']);
+      if (data['icon'] != null && data['icon'] is! String) {
+        throw FlavorPilotException(
+          'Flavor "$name": icon must be a file path, e.g. assets/icons/dev.png.',
+        );
+      }
       flavors.add(Flavor.fromMap(name, data));
     }
     return flavors;
+  }
+
+  /// Checks one flavor's `env:` section: a map of valid keys with simple
+  /// values that can become fields on the generated `AppFlavor` enum.
+  void _checkEnvShape(String flavor, Object? env) {
+    if (env == null) return;
+    if (env is! Map) {
+      throw FlavorPilotException('Flavor "$flavor": env must be a YAML map.');
+    }
+    for (final MapEntry(:key, :value) in env.entries) {
+      if (!_validEnvKey.hasMatch('$key')) {
+        throw FlavorPilotException(
+          'Flavor "$flavor": invalid env key "$key". Use lowercase letters, '
+          'digits and single underscores, e.g. "base_url".',
+        );
+      }
+      if (_reservedEnvFields.contains(envFieldName('$key'))) {
+        throw FlavorPilotException(
+          'Flavor "$flavor": env key "$key" is reserved. Pick another name.',
+        );
+      }
+      final isSimple = value is String || value is bool || value is num;
+      if (!isSimple) {
+        throw FlavorPilotException(
+          'Flavor "$flavor": env key "$key" must be a text, number or '
+          'true/false.',
+        );
+      }
+      if (value is double && !value.isFinite) {
+        throw FlavorPilotException(
+          'Flavor "$flavor": env key "$key" must be a finite number.',
+        );
+      }
+    }
+  }
+
+  /// Makes sure all flavors define the same env keys with compatible types,
+  /// because each key becomes one field on the `AppFlavor` enum.
+  void _checkEnvMatches(List<Flavor> flavors) {
+    final keys = {for (final flavor in flavors) ...flavor.env.keys};
+    final flavorNames = flavors.map((f) => f.name).toSet();
+    final fields = <String, String>{};
+
+    for (final key in keys) {
+      final missing = flavors.where((f) => !f.env.containsKey(key));
+      if (missing.isNotEmpty) {
+        final names = missing.map((f) => f.name).join(', ');
+        throw FlavorPilotException(
+          'env key "$key" is missing from: $names. Every flavor needs the '
+          'same env keys.',
+        );
+      }
+      if (envDartType(flavors.map((f) => f.env[key]!)) == null) {
+        throw FlavorPilotException(
+          'env key "$key" has different types across flavors. Use the same '
+          'type (text, number or true/false) in every flavor.',
+        );
+      }
+
+      // Fields can't share a name with each other or an enum value.
+      final field = envFieldName(key);
+      if (flavorNames.contains(field)) {
+        throw FlavorPilotException(
+          'env key "$key" clashes with the flavor named "$field". Pick '
+          'another name.',
+        );
+      }
+      final other = fields[field];
+      if (other != null) {
+        throw FlavorPilotException(
+          'env keys "$other" and "$key" both become the field "$field". '
+          'Rename one of them.',
+        );
+      }
+      fields[field] = key;
+    }
   }
 
   /// Makes sure no name or alias is used twice, otherwise
