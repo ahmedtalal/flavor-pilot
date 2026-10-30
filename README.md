@@ -157,15 +157,16 @@ import 'flavors.dart';
 void main() {
   final flavor = AppFlavor.current; // e.g. AppFlavor.development
 
-  print('Running ${flavor.appName}');
-  if (flavor == AppFlavor.development) {
-    // Something only for development.
+  print('Running ${flavor.appName} against ${flavor.baseUrl}');
+  if (flavor.enableLogs) {
+    // Something only for flavors with logs turned on.
   }
   // runApp(...);
 }
 ```
 
-Need a different base URL or other settings per flavor? See
+`baseUrl` and `enableLogs` are ready to use, with **example values**. Replace
+the example URLs in `flavorpilot.yaml`, then run `flavorpilot sync`. See
 [Settings per flavor](#settings-per-flavor-env).
 
 > `AppFlavor.current` only works when the app was started with a flavor
@@ -213,8 +214,8 @@ Every change is listed here, so nothing is a surprise.
 
 `lib/main.dart` is **never** changed.
 
-`env` and `icon` aren't part of the `init` questions: add them to
-`flavorpilot.yaml` afterwards and run `flavorpilot sync`.
+`init` doesn't add icons, because they need a real image. See
+[Icons per flavor](#icons-per-flavor).
 
 ## Commands
 
@@ -296,7 +297,9 @@ It does three things in order:
 3. Copies the result to `dist/<app>-<flavor>-<version>.<ext>`, e.g.
    `dist/my_app-production-1.4.0+12.aab`.
 
-If the build fails, the version change is **undone automatically**.
+If the build fails, the version change is **undone automatically**. It also
+warns you if the flavor still has example `env` values, but doesn't stop the
+build.
 
 | Option | Default | Meaning |
 | --- | --- | --- |
@@ -344,6 +347,20 @@ new flavor's `base_url` before using it**.
 
 > `add` rewrites `flavorpilot.yaml`, so comments you wrote in it are removed.
 
+### `env`: add example settings to an existing setup
+
+```sh
+flavorpilot env
+```
+
+Adds `base_url` and `enable_logs` with example values to every flavor, then
+updates the project. Use it in a project set up with flavorpilot 0.2.0 or
+older; `init` already does this for new projects.
+
+Values already in `flavorpilot.yaml` are never changed, so it's safe to run
+again. When it adds something, it rewrites `flavorpilot.yaml`, so comments you
+wrote in it are removed.
+
 ### `sync`: apply changes from `flavorpilot.yaml`
 
 ```sh
@@ -368,14 +385,16 @@ on disk. It lists any file that is missing or out of date.
 - Exit code `0`: everything is in sync.
 - Exit code `1`: something needs fixing; usually `flavorpilot sync` fixes it.
 
-Handy in CI to catch a forgotten `sync`.
+Handy in CI to catch a forgotten `sync`. It also warns about example `env`
+values, without failing the check.
 
 ## Settings per flavor: `env`
 
 Use `env` for values that differ between flavors, like a base URL or a logging
-switch.
+switch. `init` adds `base_url` and `enable_logs` with example values for you.
+In an older setup, run `flavorpilot env` to add them.
 
-**1. Add them to `flavorpilot.yaml`:**
+**1. Change the values or add your own in `flavorpilot.yaml`:**
 
 ```yaml
 flavors:
@@ -597,6 +616,7 @@ Don't edit the marked blocks by hand: `sync` will replace them. Change
 | `… already has … icons that were not created by flavorpilot` | The flavor has hand-made icons. Delete them, or remove `icon` from the flavor. |
 | App throws `Unknown flavor "null"` at startup | The app was started without a flavor. Use `flavorpilot run <flavor>` or one of the IDE run configurations. |
 | `doctor` lists files as out of date | A file was edited by hand or `flavorpilot.yaml` changed. Run `flavorpilot sync`, then review with `git diff`. |
+| `These env values are still examples: …` (warning) | Replace the `example.com` URLs in `flavorpilot.yaml` with your real ones, then run `flavorpilot sync`. |
 | iOS build can't find Pods settings | Run `cd ios && pod install`. If `ios/Podfile` was created after `init`, run `flavorpilot sync` first. |
 
 ### Exit codes

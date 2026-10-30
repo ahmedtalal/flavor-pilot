@@ -62,6 +62,9 @@ class DoctorCommand extends FlavorPilotCommand {
         if (File(path).existsSync()) p.relative(path, from: projectDir),
     ];
 
+    // Example values don't fail the check: they're fine while developing.
+    warnAboutPlaceholders(config.flavors);
+
     if (outdated.isEmpty) {
       logger.success('All flavor files are up to date.');
       return 0;

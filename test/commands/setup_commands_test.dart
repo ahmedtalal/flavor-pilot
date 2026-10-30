@@ -10,19 +10,6 @@ import 'package:test/test.dart';
 
 import '../helpers.dart';
 
-/// A logger that remembers warnings, so tests can check them.
-class _RecordingLogger extends Logger {
-  _RecordingLogger() : super(useColors: false);
-
-  final warnings = <String>[];
-
-  @override
-  void warn(String message) {
-    warnings.add(message);
-    super.warn(message);
-  }
-}
-
 /// Reads a binary file as bytes, for comparing generated icons.
 List<int> readBytes(String dir, String path) =>
     File(p.join(dir, path)).readAsBytesSync();
@@ -124,7 +111,7 @@ flavors:
     env:
       base_url: "https://example.com"
 ''');
-      final logger = _RecordingLogger();
+      final logger = RecordingLogger();
 
       final code = await FlavorPilotRunner(
         logger: logger,
@@ -133,13 +120,13 @@ flavors:
       ).run(['init', '--yes', '--force']);
 
       expect(code, 0);
-      expect(logger.warnings.single, contains('will be lost'));
+      expect(logger.warnings, anyElement(contains('will be lost')));
     });
 
     test('--force does not warn when there is nothing to lose', () async {
       final dir = createTempProject();
-      await runFlavorPilot(dir, ['init', '--yes']);
-      final logger = _RecordingLogger();
+      writeFile(dir, 'flavorpilot.yaml', 'flavors:\n  production: {}\n');
+      final logger = RecordingLogger();
 
       await FlavorPilotRunner(
         logger: logger,
@@ -147,7 +134,7 @@ flavors:
         projectDir: dir,
       ).run(['init', '--yes', '--force']);
 
-      expect(logger.warnings, isEmpty);
+      expect(logger.warnings, isNot(anyElement(contains('will be lost'))));
     });
 
     test('refuses to run twice without --force', () async {
@@ -191,6 +178,7 @@ flavors:
         'Sample UAT',
         '--app-id',
         'com.example.sample.uat',
+        '--yes',
       ]);
 
       expect(code, 0);
@@ -317,7 +305,7 @@ flavors:
 
     test('--yes copies production values and warns about them', () async {
       final dir = await createEnvProject();
-      final logger = _RecordingLogger();
+      final logger = RecordingLogger();
 
       final code = await FlavorPilotRunner(
         logger: logger,
@@ -335,8 +323,8 @@ flavors:
 
     test('--yes does not warn when flavors have no env', () async {
       final dir = createTempProject();
-      await runFlavorPilot(dir, ['init', '--yes']);
-      final logger = _RecordingLogger();
+      writeFile(dir, 'flavorpilot.yaml', 'flavors:\n  production: {}\n');
+      final logger = RecordingLogger();
 
       await FlavorPilotRunner(
         logger: logger,
@@ -393,7 +381,15 @@ flavors:
 
     test('an env mistake changes no file', () async {
       final dir = await createProject();
-      addToDevelopment(dir, 'env: {base_url: "https://dev.example.com"}');
+      // Remove a key from one flavor only, which the other flavors still have.
+      writeFile(
+        dir,
+        'flavorpilot.yaml',
+        readFile(
+          dir,
+          'flavorpilot.yaml',
+        ).replaceFirst(RegExp(r'      base_url: .*\n'), ''),
+      );
       final before = snapshot(dir);
 
       expect(await runFlavorPilot(dir, ['sync']), 1);

@@ -1,3 +1,11 @@
+## 0.3.0
+
+- `init` adds `base_url` and `enable_logs` with example values to every flavor,
+  so `AppFlavor.current.baseUrl` works right away.
+- New `env` command adds the same settings to an existing setup, without
+  changing values already there.
+- `init`, `env`, `doctor` and `release` warn about example values still in use.
+
 ## 0.2.0
 
 - `env` in `flavorpilot.yaml`: per-flavor settings like `base_url`, available

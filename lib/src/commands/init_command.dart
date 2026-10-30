@@ -6,6 +6,7 @@ import '../config/config_loader.dart';
 import '../generators/project_setup.dart';
 import '../models/main_mode.dart';
 import '../models/project_config.dart';
+import '../utils/env_defaults.dart';
 import '../utils/exceptions.dart';
 import '../utils/flavor_questions.dart';
 import '../utils/prompter.dart';
@@ -17,6 +18,7 @@ import 'flavorpilot_command.dart';
 /// 1. Asks a few questions (flavor names, aliases, app names, ids, and
 ///    whether each flavor gets its own main file).
 /// 2. Saves the answers to `flavorpilot.yaml`.
+///    Each flavor also gets example env settings, like `base_url`.
 /// 3. Runs every generator to update Android, iOS, Dart and IDE files.
 ///
 /// Use `--yes` to skip the questions and accept all defaults.
@@ -70,6 +72,7 @@ class InitCommand extends FlavorPilotCommand {
     ).apply(config, saveConfig: true);
 
     _printNextSteps(config);
+    warnAboutPlaceholders(config.flavors);
     return 0;
   }
 
@@ -139,7 +142,7 @@ class InitCommand extends FlavorPilotCommand {
 
     final flavors = [
       for (final name in names)
-        questions.ask(name, baseName: baseName, baseId: baseId),
+        withDefaultEnv(questions.ask(name, baseName: baseName, baseId: baseId)),
     ];
 
     final separateMains = prompter.confirm(
@@ -163,7 +166,7 @@ class InitCommand extends FlavorPilotCommand {
       ..info('Next steps:')
       ..info(
         '  • Use AppFlavor.current (lib/flavors.dart) to read the flavor in '
-        'your code.',
+        'your code, e.g. AppFlavor.current.baseUrl.',
       )
       ..info(
         '  • iOS with CocoaPods: run `pod install` in ios/. If ios/Podfile '

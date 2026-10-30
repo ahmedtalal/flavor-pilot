@@ -5,6 +5,7 @@ import 'package:args/command_runner.dart';
 import 'commands/add_command.dart';
 import 'commands/build_command.dart';
 import 'commands/doctor_command.dart';
+import 'commands/env_command.dart';
 import 'commands/init_command.dart';
 import 'commands/release_command.dart';
 import 'commands/run_command.dart';
@@ -41,6 +42,9 @@ class FlavorPilotRunner extends CommandRunner<int> {
     );
     addCommand(
       AddCommand(logger: _logger, processRunner: runner, projectDir: dir),
+    );
+    addCommand(
+      EnvCommand(logger: _logger, processRunner: runner, projectDir: dir),
     );
     addCommand(
       SyncCommand(logger: _logger, processRunner: runner, projectDir: dir),

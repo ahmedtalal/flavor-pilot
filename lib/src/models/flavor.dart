@@ -42,6 +42,19 @@ class Flavor {
   /// Returns true when [input] is this flavor's [name] or [alias].
   bool matches(String input) => input == name || input == alias;
 
+  /// Returns a copy of this flavor with [env] as its settings.
+  Flavor copyWithEnv(Map<String, Object> env) {
+    return Flavor(
+      name: name,
+      alias: alias,
+      appName: appName,
+      androidId: androidId,
+      iosBundleId: iosBundleId,
+      icon: icon,
+      env: env,
+    );
+  }
+
   /// Builds a [Flavor] from one entry of the `flavors:` map in the YAML file.
   ///
   /// [name] is the map key and [data] is the map value under it.

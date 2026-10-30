@@ -3,6 +3,7 @@ import 'package:args/command_runner.dart';
 import '../config/config_loader.dart';
 import '../models/flavor.dart';
 import '../models/project_config.dart';
+import '../utils/env_defaults.dart';
 import '../utils/exceptions.dart';
 import '../utils/logger.dart';
 import '../utils/process_runner.dart';
@@ -62,6 +63,17 @@ abstract class FlavorPilotCommand extends Command<int> {
   /// In `flavorpilot run dev -- --dart-define=X=1`, this returns
   /// `['--dart-define=X=1']`.
   List<String> get passthroughArgs => argResults!.rest.skip(1).toList();
+
+  /// Warns about settings in [flavors] that still hold an example value, so
+  /// a build doesn't ship with a fake URL by mistake.
+  void warnAboutPlaceholders(Iterable<Flavor> flavors) {
+    final placeholders = placeholderEnv(flavors);
+    if (placeholders.isEmpty) return;
+    logger.warn(
+      'These env values are still examples: ${placeholders.join(', ')}. '
+      'Replace them in flavorpilot.yaml, then run `flavorpilot sync`.',
+    );
+  }
 
   /// A short "Available flavors: ..." hint, e.g. `development (dev)`.
   String _available(ProjectConfig config) {

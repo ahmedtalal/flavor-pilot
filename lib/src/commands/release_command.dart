@@ -73,6 +73,7 @@ class ReleaseCommand extends FlavorPilotCommand {
     final flavor = resolveFlavor(config);
     final target = argResults!.option('target')!;
     final bump = VersionBump.values.byName(argResults!.option('bump')!);
+    warnAboutPlaceholders([flavor]);
 
     // 1. Bump the version, remembering the original file so it can be put
     //    back if the build fails.

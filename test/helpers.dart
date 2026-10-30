@@ -72,6 +72,19 @@ void writePng(
     ..writeAsBytesSync(img.encodePng(image));
 }
 
+/// A logger that remembers warnings, so tests can check them.
+class RecordingLogger extends Logger {
+  RecordingLogger() : super(useColors: false);
+
+  final warnings = <String>[];
+
+  @override
+  void warn(String message) {
+    warnings.add(message);
+    super.warn(message);
+  }
+}
+
 /// A [ProcessRunner] that records commands instead of running them.
 class FakeProcessRunner extends ProcessRunner {
   FakeProcessRunner({this.exitCode = 0, this.onRun})
