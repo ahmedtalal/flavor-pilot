@@ -64,6 +64,28 @@ abstract class FlavorPilotCommand extends Command<int> {
   /// `['--dart-define=X=1']`.
   List<String> get passthroughArgs => argResults!.rest.skip(1).toList();
 
+  /// Adds the `--split-per-abi` flag (shortcuts `--split` and `-s`), shared
+  /// by `build` and `release`.
+  void addSplitPerAbiFlag() => argParser.addFlag(
+    'split-per-abi',
+    abbr: 's',
+    aliases: const ['split'],
+    negatable: false,
+    help:
+        'Build one smaller APK per CPU architecture instead of one large '
+        'APK. Only with --target apk. Also: --split.',
+  );
+
+  /// Whether `--split-per-abi` was given. Shows the usage help if it was
+  /// combined with a [target] other than `apk`, where Flutter rejects it.
+  bool splitPerAbi(String target) {
+    final split = argResults!.flag('split-per-abi');
+    if (split && target != 'apk') {
+      usageException('--split-per-abi only works with --target apk.');
+    }
+    return split;
+  }
+
   /// Warns about settings in [flavors] that still hold an example value, so
   /// a build doesn't ship with a fake URL by mistake.
   void warnAboutPlaceholders(Iterable<Flavor> flavors) {

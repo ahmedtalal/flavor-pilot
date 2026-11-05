@@ -82,6 +82,45 @@ flavors:
         '--release',
       ]);
     });
+
+    for (final flag in ['--split-per-abi', '--split', '-s']) {
+      test('$flag splits the APK per CPU architecture', () async {
+        final fake = FakeProcessRunner();
+        final code = await runFlavorPilot(projectWith(yaml), [
+          'build',
+          'dev',
+          flag,
+          '--',
+          '--obfuscate',
+        ], processRunner: fake);
+
+        expect(code, 0);
+        expect(fake.calls.single, [
+          'flutter',
+          'build',
+          'apk',
+          '--flavor',
+          'development',
+          '--release',
+          '--split-per-abi',
+          '--obfuscate',
+        ]);
+      });
+    }
+
+    test('--split with a target other than apk is a usage error', () async {
+      final fake = FakeProcessRunner();
+      final code = await runFlavorPilot(projectWith(yaml), [
+        'build',
+        'dev',
+        '-s',
+        '--target',
+        'appbundle',
+      ], processRunner: fake);
+
+      expect(code, 64);
+      expect(fake.calls, isEmpty);
+    });
   });
 
   group('errors', () {

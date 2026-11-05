@@ -9,6 +9,7 @@ import 'flavorpilot_command.dart';
 /// flavorpilot build prod                     # flutter build apk --flavor production --release
 /// flavorpilot build prod --target appbundle  # Play Store bundle
 /// flavorpilot build qa --target ipa          # iOS archive
+/// flavorpilot build prod -s                  # one APK per CPU architecture
 /// flavorpilot build dev --mode debug
 /// ```
 class BuildCommand extends FlavorPilotCommand {
@@ -34,6 +35,7 @@ class BuildCommand extends FlavorPilotCommand {
         allowed: BuildMode.values.map((m) => m.name),
         defaultsTo: BuildMode.release.name,
       );
+    addSplitPerAbiFlag();
   }
 
   /// Flutter build targets that support `--flavor`.
@@ -53,13 +55,14 @@ class BuildCommand extends FlavorPilotCommand {
   Future<int> run() async {
     final config = loadConfig();
     final flavor = resolveFlavor(config);
+    final target = argResults!.option('target')!;
 
     final args = flutterArgs(
-      command: ['build', argResults!.option('target')!],
+      command: ['build', target],
       flavor: flavor,
       mode: BuildMode.values.byName(argResults!.option('mode')!),
       entryPoint: config.entryPointFor(flavor),
-      extra: passthroughArgs,
+      extra: [if (splitPerAbi(target)) '--split-per-abi', ...passthroughArgs],
     );
 
     final exitCode = await processRunner.run(

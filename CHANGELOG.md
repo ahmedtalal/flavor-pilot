@@ -1,3 +1,9 @@
+## Unreleased
+
+- `build` and `release` accept `--split-per-abi` (shortcuts `--split` and
+  `-s`) to make one APK per CPU architecture. `release` copies every split
+  APK to `dist/` with its architecture in the name.
+
 ## 0.3.0
 
 - `init` adds `base_url` and `enable_logs` with example values to every flavor,

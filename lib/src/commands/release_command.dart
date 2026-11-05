@@ -18,6 +18,7 @@ import 'flavorpilot_command.dart';
 /// flavorpilot release prod                          # build number +1, APK
 /// flavorpilot release prod --bump patch --target appbundle
 /// flavorpilot release qa --target ipa --bump none
+/// flavorpilot release prod -s                       # one APK per CPU architecture
 /// ```
 ///
 /// The file is copied to `dist/`, named like
@@ -48,6 +49,7 @@ class ReleaseCommand extends FlavorPilotCommand {
         help: 'Folder to copy the finished file into.',
         defaultsTo: 'dist',
       );
+    addSplitPerAbiFlag();
   }
 
   /// Release targets and the file extension each one produces.
@@ -73,6 +75,7 @@ class ReleaseCommand extends FlavorPilotCommand {
     final flavor = resolveFlavor(config);
     final target = argResults!.option('target')!;
     final bump = VersionBump.values.byName(argResults!.option('bump')!);
+    final split = splitPerAbi(target);
     warnAboutPlaceholders([flavor]);
 
     // 1. Bump the version, remembering the original file so it can be put
@@ -82,6 +85,7 @@ class ReleaseCommand extends FlavorPilotCommand {
     final version = _bumpVersion(pubspec, original, bump);
 
     // 2. Build.
+    final buildStart = DateTime.now();
     final exitCode = await processRunner.run(
       'flutter',
       flutterArgs(
@@ -89,7 +93,7 @@ class ReleaseCommand extends FlavorPilotCommand {
         flavor: flavor,
         mode: BuildMode.release,
         entryPoint: config.entryPointFor(flavor),
-        extra: passthroughArgs,
+        extra: [if (split) '--split-per-abi', ...passthroughArgs],
       ),
       workingDirectory: projectDir,
     );
@@ -101,29 +105,67 @@ class ReleaseCommand extends FlavorPilotCommand {
       return exitCode;
     }
 
-    // 3. Copy the result to the output folder with a clear name.
-    final output = _findOutput(target, flavor);
-    if (output == null) {
+    // 3. Copy the result to the output folder with a clear name. A split
+    //    build makes one APK per CPU architecture, so the name includes it.
+    final appName = (loadYaml(original) as Map)['name'];
+    final outputs = split
+        ? _findSplitApks(flavor, buildStart)
+        : {'': ?_findOutput(target, flavor)};
+    if (outputs.isEmpty) {
       logger.warn(
         'Build succeeded, but the output file was not found, so nothing '
         'was copied.',
       );
       return 0;
     }
-    final appName = (loadYaml(original) as Map)['name'];
-    final destination = p.join(
-      projectDir,
-      argResults!.option('out')!,
-      '$appName-${flavor.name}-$version.${_extensions[target]}',
-    );
-    Directory(p.dirname(destination)).createSync(recursive: true);
-    output.copySync(destination);
 
-    logger.success(
-      'Released "${flavor.name}" $version → '
-      '${p.relative(destination, from: projectDir)}',
-    );
+    final outDir = p.join(projectDir, argResults!.option('out')!);
+    Directory(outDir).createSync(recursive: true);
+    for (final MapEntry(key: abi, value: file) in outputs.entries) {
+      final abiPart = abi.isEmpty ? '' : '-$abi';
+      final destination = p.join(
+        outDir,
+        '$appName-${flavor.name}$abiPart-$version.${_extensions[target]}',
+      );
+      file.copySync(destination);
+      logger.success(
+        'Released "${flavor.name}" $version → '
+        '${p.relative(destination, from: projectDir)}',
+      );
+    }
     return 0;
+  }
+
+  /// Finds the APKs a `--split-per-abi` build just made for [flavor], by
+  /// CPU architecture (e.g. `arm64-v8a`).
+  ///
+  /// Flutter names them `app-<abi>-<flavor>-release.apk` and never deletes
+  /// old ones, so files older than [buildStart] (left by an earlier build)
+  /// are skipped.
+  Map<String, File> _findSplitApks(Flavor flavor, DateTime buildStart) {
+    final dir = Directory(
+      p.join(projectDir, 'build', 'app', 'outputs', 'flutter-apk'),
+    );
+    if (!dir.existsSync()) return const {};
+
+    final name = RegExp(
+      '^app-(.+)-${RegExp.escape(flavor.name)}-release\\.apk\$',
+    );
+    // Some file systems only store whole seconds, so compare to the start
+    // of the second the build began.
+    final since = DateTime.fromMillisecondsSinceEpoch(
+      buildStart.millisecondsSinceEpoch ~/ 1000 * 1000,
+    );
+
+    final found = <String, File>{};
+    for (final file in dir.listSync().whereType<File>()) {
+      final match = name.firstMatch(p.basename(file.path));
+      if (match == null || file.lastModifiedSync().isBefore(since)) continue;
+      found[match[1]!] = file;
+    }
+    return Map.fromEntries(
+      found.entries.toList()..sort((a, b) => a.key.compareTo(b.key)),
+    );
   }
 
   /// Writes the bumped version into pubspec.yaml and returns it.

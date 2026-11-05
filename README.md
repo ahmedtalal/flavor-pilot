@@ -273,9 +273,11 @@ flavorpilot build <flavor> [--target apk|appbundle|ios|ipa] [--mode ...]
 | --- | --- | --- |
 | `--target` | `apk` | What to build. |
 | `-m`, `--mode` | `release` | Build mode. |
+| `-s`, `--split`, `--split-per-abi` | off | One smaller APK per CPU architecture instead of one large APK. Only with `--target apk`. |
 
 ```sh
 flavorpilot build prod                       # release APK
+flavorpilot build prod -s                    # one APK per CPU architecture
 flavorpilot build prod --target appbundle    # for Google Play
 flavorpilot build qa --target ipa            # for TestFlight / App Store
 flavorpilot build dev --target ios --mode debug -- --simulator
@@ -306,6 +308,7 @@ build.
 | `--target` | `apk` | `apk`, `appbundle` or `ipa`. |
 | `--bump` | `build` | Which part of the version to increase (see below). |
 | `--out` | `dist` | Folder for the finished file. |
+| `-s`, `--split`, `--split-per-abi` | off | One APK per CPU architecture, each copied with its architecture in the name, e.g. `dist/my_app-production-arm64-v8a-1.4.0+12.apk`. Only with `--target apk`. |
 
 | `--bump` | `1.2.3+4` becomes |
 | --- | --- |
@@ -320,6 +323,7 @@ stores reject an upload that reuses one.
 
 ```sh
 flavorpilot release prod --target appbundle --bump patch
+flavorpilot release prod -s --bump patch     # split APKs
 ```
 
 > For `ipa`, signing must already be set up in Xcode for that flavor's

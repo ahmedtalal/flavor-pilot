@@ -84,6 +84,80 @@ void main() {
     expect(Directory(p.join(dir, 'dist')).existsSync(), isFalse);
   });
 
+  group('--split', () {
+    const apkDir = 'build/app/outputs/flutter-apk';
+
+    test('copies one APK per CPU architecture', () async {
+      final dir = createProject();
+      final fake = FakeProcessRunner(
+        onRun: (_) {
+          for (final abi in ['arm64-v8a', 'armeabi-v7a', 'x86_64']) {
+            writeFile(dir, '$apkDir/app-$abi-production-release.apk', abi);
+          }
+        },
+      );
+
+      final code = await runFlavorPilot(dir, [
+        'release',
+        'prod',
+        '-s',
+        '--bump',
+        'patch',
+      ], processRunner: fake);
+
+      expect(code, 0);
+      expect(fake.calls.single, contains('--split-per-abi'));
+      for (final abi in ['arm64-v8a', 'armeabi-v7a', 'x86_64']) {
+        expect(readFile(dir, 'dist/sample-production-$abi-1.0.1+2.apk'), abi);
+      }
+    });
+
+    test('skips APKs left by an earlier build', () async {
+      final dir = createProject();
+      final old = File(p.join(dir, '$apkDir/app-x86-production-release.apk'))
+        ..createSync(recursive: true);
+      old.setLastModifiedSync(DateTime.now().subtract(Duration(hours: 1)));
+      final fake = FakeProcessRunner(
+        onRun: (_) => writeFile(
+          dir,
+          '$apkDir/app-arm64-v8a-production-release.apk',
+          'new',
+        ),
+      );
+
+      await runFlavorPilot(dir, [
+        'release',
+        'prod',
+        '--split',
+      ], processRunner: fake);
+
+      final copied = Directory(
+        p.join(dir, 'dist'),
+      ).listSync().map((f) => p.basename(f.path));
+      expect(copied, ['sample-production-arm64-v8a-1.0.0+2.apk']);
+    });
+
+    test(
+      'with --target appbundle is a usage error and bumps nothing',
+      () async {
+        final dir = createProject();
+        final fake = FakeProcessRunner();
+
+        final code = await runFlavorPilot(dir, [
+          'release',
+          'prod',
+          '-s',
+          '--target',
+          'appbundle',
+        ], processRunner: fake);
+
+        expect(code, 64);
+        expect(fake.calls, isEmpty);
+        expect(readFile(dir, 'pubspec.yaml'), fixturePubspec);
+      },
+    );
+  });
+
   test('--bump none keeps pubspec.yaml untouched', () async {
     final dir = createProject();
     final fake = fakeBuild(
