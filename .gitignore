@@ -10,3 +10,6 @@ test/fixtures/flutter_app/android/local.properties
 test/fixtures/flutter_app/android/app/src/main/java/
 test/fixtures/flutter_app/ios/Flutter/
 test/fixtures/flutter_app/ios/Runner/GeneratedPluginRegistrant.*
+
+.DS_Store
+.claude/
