@@ -22,7 +22,13 @@ Map<String, Object> defaultEnv(Flavor flavor) {
 /// Returns a copy of [flavor] with any missing example settings added.
 /// Values the flavor already has are never changed.
 Flavor withDefaultEnv(Flavor flavor) {
-  return flavor.copyWithEnv({...defaultEnv(flavor), ...flavor.env});
+  return flavor.copyWith(env: {...defaultEnv(flavor), ...flavor.env});
+}
+
+/// Returns a copy of [flavor] with an `env_file`, `.env.<flavor>` by default.
+/// A flavor that already has one keeps it.
+Flavor withDefaultEnvFile(Flavor flavor) {
+  return flavor.copyWith(envFile: flavor.envFile ?? '.env.${flavor.name}');
 }
 
 /// Lists the settings in [flavors] that still hold an example value, like

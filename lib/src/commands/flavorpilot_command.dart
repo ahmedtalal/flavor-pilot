@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:args/command_runner.dart';
+import 'package:path/path.dart' as p;
 
 import '../config/config_loader.dart';
 import '../models/flavor.dart';
@@ -41,7 +44,8 @@ abstract class FlavorPilotCommand extends Command<int> {
   /// e.g. `dev` in `flavorpilot run dev`, and returns the matching flavor.
   ///
   /// Shows the usage help if no flavor was given, and lists the available
-  /// flavors if the given one doesn't exist.
+  /// flavors if the given one doesn't exist. Also stops if the flavor's
+  /// `.env` file is missing, before Flutter starts.
   Flavor resolveFlavor(ProjectConfig config) {
     final rest = argResults!.rest;
     if (rest.isEmpty) {
@@ -53,6 +57,13 @@ abstract class FlavorPilotCommand extends Command<int> {
     if (flavor == null) {
       throw FlavorPilotException(
         'Unknown flavor "$input". ${_available(config)}',
+      );
+    }
+    final envFile = flavor.envFile;
+    if (envFile != null && !File(p.join(projectDir, envFile)).existsSync()) {
+      throw FlavorPilotException(
+        '$envFile was not found (the env_file of "${flavor.name}"). Run '
+        '`flavorpilot sync` to create it, then add your values.',
       );
     }
     return flavor;

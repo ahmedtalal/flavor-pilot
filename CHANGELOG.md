@@ -1,8 +1,16 @@
-## Unreleased
+## 0.4.0
 
 - `build` and `release` accept `--split-per-abi` (shortcuts `--split` and
   `-s`) to make one APK per CPU architecture. `release` copies every split
   APK to `dist/` with its architecture in the name.
+- `.env` files per flavor: `init` asks whether to create them, and the new
+  `dotenv` command adds them to an existing setup. Each flavor's file is
+  added to `.gitignore` and loaded automatically by `run`, `build`,
+  `release` and the IDE run configurations. `add` creates one for the new
+  flavor.
+- Fix: `release` now undoes the version change whenever the build doesn't
+  finish, including when Flutter can't start or Ctrl+C is pressed.
+- Fix: a missing `flutter` shows a clear message instead of a stack trace.
 
 ## 0.3.0
 

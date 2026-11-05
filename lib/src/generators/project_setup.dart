@@ -7,6 +7,7 @@ import '../utils/file_changes.dart';
 import '../utils/logger.dart';
 import 'android_generator.dart';
 import 'dart_generator.dart';
+import 'dotenv_generator.dart';
 import 'generator.dart';
 import 'icon_generator.dart';
 import 'ide_generator.dart';
@@ -30,6 +31,7 @@ class ProjectSetup {
     IconGenerator(projectDir: projectDir, logger: logger),
     DartGenerator(projectDir: projectDir, logger: logger),
     IdeGenerator(projectDir: projectDir, logger: logger),
+    DotenvGenerator(projectDir: projectDir, logger: logger),
   ];
 
   /// Works out every file change for [config] without writing anything.

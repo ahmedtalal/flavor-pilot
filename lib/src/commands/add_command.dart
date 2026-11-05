@@ -1,5 +1,6 @@
 import '../generators/project_setup.dart';
 import '../models/project_config.dart';
+import '../utils/env_defaults.dart';
 import '../utils/exceptions.dart';
 import '../utils/flavor_questions.dart';
 import '../utils/prompter.dart';
@@ -89,8 +90,13 @@ class AddCommand extends FlavorPilotCommand {
       envDefaults: envSource.env,
     );
 
+    // When the project uses .env files, the new flavor gets one too.
+    final usesEnvFiles = config.flavors.any((f) => f.envFile != null);
     final updated = ProjectConfig(
-      flavors: [...config.flavors, flavor],
+      flavors: [
+        ...config.flavors,
+        usesEnvFiles ? withDefaultEnvFile(flavor) : flavor,
+      ],
       mainMode: config.mainMode,
     );
     // Saving the config also validates it, so a duplicate name or alias is

@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 
 import '../models/project_config.dart';
 import '../utils/file_changes.dart';
+import '../utils/flutter_args.dart';
 import 'generator.dart';
 
 /// Adds a run configuration per flavor for VS Code and Android Studio, so
@@ -59,7 +60,7 @@ class IdeGenerator extends Generator {
         'request': 'launch',
         'type': 'dart',
         'program': ?entryPoint,
-        'args': ['--flavor', flavor.name],
+        'args': ['--flavor', flavor.name, ?dartDefineFromFile(flavor)],
       };
     });
     launch['configurations'] = [...kept, ...ours];
@@ -78,10 +79,14 @@ class IdeGenerator extends Generator {
 
     for (final flavor in config.flavors) {
       final entryPoint = config.entryPointFor(flavor) ?? 'lib/main.dart';
+      final args = dartDefineFromFile(flavor);
+      final argsOption = args == null
+          ? ''
+          : '    <option name="additionalArgs" value="$args" />\n';
       changes.write(p.join(dir, '${flavor.name}.run.xml'), '''
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="${flavor.name}" type="FlutterRunConfigurationType" factoryName="Flutter">
-    <option name="buildFlavor" value="${flavor.name}" />
+$argsOption    <option name="buildFlavor" value="${flavor.name}" />
     <option name="filePath" value="\$PROJECT_DIR\$/$entryPoint" />
     <method v="2" />
   </configuration>

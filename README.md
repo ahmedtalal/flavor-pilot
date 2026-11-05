@@ -29,6 +29,7 @@ flavorpilot build prod --target appbundle
 - [What `init` changes in your project](#what-init-changes-in-your-project)
 - [Commands](#commands)
 - [Settings per flavor: `env`](#settings-per-flavor-env)
+- [`.env` files per flavor](#env-files-per-flavor)
 - [Icons per flavor](#icons-per-flavor)
 - [The `flavorpilot.yaml` file](#the-flavorpilotyaml-file)
 - [Common tasks](#common-tasks)
@@ -111,6 +112,7 @@ Flavors (comma separated) [development,staging,production]:
   [staging] short alias [stg]:
   ...
 Create a separate main file for each flavor? (y/N):
+Create a .env file for each flavor? (y/N):
 ```
 
 | Question | What it means |
@@ -121,6 +123,7 @@ Create a separate main file for each flavor? (y/N):
 | short alias | A short name you'll type in commands, e.g. `dev` in `flavorpilot run dev`. |
 | app name / app id | The name and id for that flavor. `production` keeps the base values. |
 | Separate main file? | **No** (recommended, the default): one `lib/main.dart` for all flavors. **Yes**: one `lib/main_<flavor>.dart` per flavor, useful when each flavor needs different startup code (for example a separate Firebase project). |
+| `.env` file for each flavor? | **No** (the default): no `.env` files. **Yes**: creates `.env.<flavor>` for every flavor. See [`.env` files per flavor](#env-files-per-flavor). |
 
 > Want to skip the questions? `flavorpilot init --yes` uses every default.
 
@@ -211,6 +214,8 @@ Every change is listed here, so nothing is a surprise.
 | Dart | `lib/main_<flavor>.dart` | **Created** only if you chose one main file per flavor. Existing files are kept. |
 | IDE | `.vscode/launch.json` | Adds entries named `<flavor> (flavorpilot)`. Your own entries are kept. |
 | IDE | `.run/<flavor>.run.xml` | **Created.** Android Studio run configurations. |
+| dotenv | `.env.<flavor>` | **Created** only if you answered yes to the `.env` question. Existing files are kept. |
+| dotenv | `.gitignore` | Lists the `.env` files between `# flavorpilot:start` / `# flavorpilot:end`, only when they are used. |
 
 `lib/main.dart` is **never** changed.
 
@@ -365,6 +370,20 @@ Values already in `flavorpilot.yaml` are never changed, so it's safe to run
 again. When it adds something, it rewrites `flavorpilot.yaml`, so comments you
 wrote in it are removed.
 
+### `dotenv`: add a `.env` file to every flavor
+
+```sh
+flavorpilot dotenv
+```
+
+Gives every flavor its own `.env` file (`.env.development`, `.env.production`,
+…), adds them to `.gitignore`, and makes `run`, `build`, `release` and the IDE
+run configurations load them. Use it in a project where you answered **No** to
+the `.env` question in `init`. See [`.env` files per flavor](#env-files-per-flavor).
+
+Existing `.env` files are never changed, so it's safe to run again. It rewrites
+`flavorpilot.yaml`, so comments you wrote in it are removed.
+
 ### `sync`: apply changes from `flavorpilot.yaml`
 
 ```sh
@@ -448,6 +467,67 @@ Rules, checked before any file changes:
 > are stored in `flavorpilot.yaml` in your Git repository and inside the built
 > app, where anyone can extract them.
 
+## `.env` files per flavor
+
+Use `.env` files for values you don't want in Git, like API keys. Each flavor
+gets its own file, and flavorpilot always loads the right one.
+
+**1. Create the files.** Answer **yes** to the `.env` question in `init`, or
+run:
+
+```sh
+flavorpilot dotenv
+```
+
+This creates one file per flavor and adds them to `.gitignore`:
+
+```text
+.env.development
+.env.staging
+.env.production
+```
+
+**2. Add your values**, one per line:
+
+```sh
+# .env.development
+API_KEY=dev-key-123
+MAPS_KEY=abc
+```
+
+**3. Read them in your app:**
+
+```dart
+const apiKey = String.fromEnvironment('API_KEY');
+```
+
+**4. Run as usual.** No extra flags are needed:
+
+```sh
+flavorpilot run dev          # loads .env.development
+flavorpilot release prod     # loads .env.production
+```
+
+flavorpilot passes the file to Flutter with `--dart-define-from-file`, and the
+VS Code and Android Studio run configurations do the same. If a flavor's file
+is missing, flavorpilot stops with a clear message instead of building without
+your values.
+
+Each flavor has an `env_file` setting in `flavorpilot.yaml`. Change it to use
+another file name, then run `flavorpilot sync`. A flavor added later with `add`
+gets its own `.env` file automatically.
+
+- **Share the key names with your team** in a file like `.env.example`
+  (without the values); the `.env` files themselves stay on each computer.
+- **In CI**, create the file from your CI secrets before building, e.g.
+  `echo "$PROD_ENV" > .env.production`.
+- These values are kept out of Git, but they are still **inside the built
+  app**. Use them for keys meant for apps (Maps, analytics, publishable
+  payment keys), never for server passwords or private keys.
+- `env` and `env_file` are different: `env` values live in
+  `flavorpilot.yaml` and become fields on `AppFlavor`; `env_file` values stay
+  in your `.env` files and are read with `String.fromEnvironment`.
+
 ## Icons per flavor
 
 Give a flavor its own icon so you can tell the builds apart on your device.
@@ -515,6 +595,7 @@ flavors:
 | `ios_bundle_id` | No | iOS bundle identifier. Defaults to the project's own id. |
 | `icon` | No | Path to the flavor's icon. See [Icons per flavor](#icons-per-flavor). |
 | `env` | No | Custom settings for the flavor. See [Settings per flavor](#settings-per-flavor-env). |
+| `env_file` | No | Path of the flavor's `.env` file, e.g. `.env.development`. See [`.env` files per flavor](#env-files-per-flavor). |
 
 Rules: flavor names start with a lowercase letter and contain only letters
 and digits; no name or alias can appear twice. See
@@ -615,6 +696,7 @@ Don't edit the marked blocks by hand: `sync` will replace them. Change
 | `Unsupported version "…" in pubspec.yaml` | `release` needs a version like `1.2.3+4` in `pubspec.yaml`. |
 | `env key "…" is missing from: …` | Every flavor needs the same `env` keys. Add the key to the flavors listed. |
 | `env key "…" has different types across flavors` | Use the same type in every flavor. Check for a number or `true` written in quotes. |
+| `.env.… was not found (the env_file of "…")` | The flavor's `.env` file is missing. Run `flavorpilot sync` to create it, then add your values. |
 | `Flavor "…": icon "…" was not found` | Fix the path in `flavorpilot.yaml`. It's relative to the project root. |
 | `Flavor "…": icon "…" is …×…` | The icon must be square and at least 1024×1024. |
 | `… already has … icons that were not created by flavorpilot` | The flavor has hand-made icons. Delete them, or remove `icon` from the flavor. |

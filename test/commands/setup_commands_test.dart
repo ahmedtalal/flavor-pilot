@@ -46,7 +46,8 @@ void main() {
     test('creates one main file per flavor when asked', () async {
       final dir = createTempProject();
       // Answers in order: app name, base id, flavors, then alias / name / id
-      // for each flavor (empty = default), then "separate main file?" → yes.
+      // for each flavor (empty = default), then "separate main file?" → yes,
+      // then ".env file for each flavor?" → no.
       final answers = [
         'Shop',
         'com.acme.shop',
@@ -54,6 +55,7 @@ void main() {
         '', '', '', //
         '', '', '', //
         'y',
+        'n',
       ];
       final runner = CommandRunner<int>('flavorpilot', 'test')
         ..addCommand(
@@ -82,7 +84,7 @@ void main() {
       'uses one main.dart when the main file question is left empty',
       () async {
         final dir = createTempProject();
-        final answers = ['', '', 'production', '', '', '', ''];
+        final answers = ['', '', 'production', '', '', '', '', ''];
         final runner = CommandRunner<int>('flavorpilot', 'test')
           ..addCommand(
             InitCommand(

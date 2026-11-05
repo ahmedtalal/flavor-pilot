@@ -127,9 +127,27 @@ class ConfigLoader {
           'Flavor "$name": icon must be a file path, e.g. assets/icons/dev.png.',
         );
       }
+      _checkEnvFile(name, data['env_file']);
       flavors.add(Flavor.fromMap(name, data));
     }
     return flavors;
+  }
+
+  /// Checks one flavor's `env_file`: a path inside the project, because
+  /// flavorpilot creates the file and adds it to `.gitignore`.
+  void _checkEnvFile(String flavor, Object? envFile) {
+    if (envFile == null) return;
+    final ok =
+        envFile is String &&
+        envFile.trim().isNotEmpty &&
+        p.isRelative(envFile) &&
+        !p.split(p.normalize(envFile)).contains('..');
+    if (!ok) {
+      throw FlavorPilotException(
+        'Flavor "$flavor": env_file must be a path inside the project, '
+        'e.g. .env.$flavor.',
+      );
+    }
   }
 
   /// Checks one flavor's `env:` section: a map of valid keys with simple

@@ -149,9 +149,13 @@ class InitCommand extends FlavorPilotCommand {
       'Create a separate main file for each flavor?',
       defaultValue: false,
     );
+    final envFiles = prompter.confirm(
+      'Create a .env file for each flavor?',
+      defaultValue: false,
+    );
 
     return ProjectConfig(
-      flavors: flavors,
+      flavors: envFiles ? flavors.map(withDefaultEnvFile).toList() : flavors,
       mainMode: separateMains ? MainMode.multiple : MainMode.single,
     );
   }

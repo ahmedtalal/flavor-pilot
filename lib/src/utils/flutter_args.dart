@@ -21,6 +21,7 @@ enum BuildMode { debug, profile, release }
 ///   `['build', 'apk']`.
 /// - [entryPoint] adds `-t <file>` when the project has one main file per
 ///   flavor.
+/// - The flavor's `env_file`, if any, is added with `--dart-define-from-file`.
 /// - [extra] is passed through untouched, so users can still use any Flutter
 ///   flag that flavorpilot doesn't know about.
 List<String> flutterArgs({
@@ -36,6 +37,17 @@ List<String> flutterArgs({
     flavor.name,
     '--${mode.name}',
     if (entryPoint != null) ...['-t', entryPoint],
+    ?dartDefineFromFile(flavor),
     ...extra,
   ];
 }
+
+/// The Flutter flag that loads [flavor]'s `.env` file, e.g.
+/// `--dart-define-from-file=.env.development`, or null when it has none.
+///
+/// Shared with the IDE run configurations, so the IDE and the terminal load
+/// the same values.
+String? dartDefineFromFile(Flavor flavor) => switch (flavor.envFile) {
+  final envFile? => '--dart-define-from-file=$envFile',
+  null => null,
+};

@@ -11,6 +11,7 @@ class Flavor {
     this.iosBundleId,
     this.icon,
     this.env = const {},
+    this.envFile,
   });
 
   /// The exact name passed to Flutter's `--flavor` flag, e.g. `development`.
@@ -39,11 +40,16 @@ class Flavor {
   /// as fields on `AppFlavor`. Values are a String, bool, int or double.
   final Map<String, Object> env;
 
+  /// Path of this flavor's `.env` file, relative to the project root, e.g.
+  /// `.env.development`. When set, `run`, `build` and `release` pass it to
+  /// Flutter with `--dart-define-from-file`.
+  final String? envFile;
+
   /// Returns true when [input] is this flavor's [name] or [alias].
   bool matches(String input) => input == name || input == alias;
 
-  /// Returns a copy of this flavor with [env] as its settings.
-  Flavor copyWithEnv(Map<String, Object> env) {
+  /// Returns a copy of this flavor with [env] and/or [envFile] replaced.
+  Flavor copyWith({Map<String, Object>? env, String? envFile}) {
     return Flavor(
       name: name,
       alias: alias,
@@ -51,7 +57,8 @@ class Flavor {
       androidId: androidId,
       iosBundleId: iosBundleId,
       icon: icon,
-      env: env,
+      env: env ?? this.env,
+      envFile: envFile ?? this.envFile,
     );
   }
 
@@ -67,6 +74,7 @@ class Flavor {
       androidId: data['android_id'] as String?,
       iosBundleId: data['ios_bundle_id'] as String?,
       icon: data['icon'] as String?,
+      envFile: data['env_file'] as String?,
       env: {
         for (final entry in (env ?? const {}).entries)
           entry.key.toString(): entry.value as Object,
@@ -86,6 +94,7 @@ class Flavor {
       'android_id': ?androidId,
       'ios_bundle_id': ?iosBundleId,
       'icon': ?icon,
+      'env_file': ?envFile,
     };
   }
 }
