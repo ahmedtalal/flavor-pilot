@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'exceptions.dart';
 import 'logger.dart';
 
 /// Runs external programs such as `flutter`.
@@ -24,14 +25,24 @@ class ProcessRunner {
   }) async {
     _logger.command([executable, ...arguments].join(' '));
 
-    final process = await Process.start(
-      executable,
-      arguments,
-      workingDirectory: workingDirectory,
-      mode: ProcessStartMode.inheritStdio,
-      // On Windows `flutter` is a .bat file, which needs a shell to start.
-      runInShell: Platform.isWindows,
-    );
+    final Process process;
+    try {
+      process = await Process.start(
+        executable,
+        arguments,
+        workingDirectory: workingDirectory,
+        mode: ProcessStartMode.inheritStdio,
+        // On Windows `flutter` is a .bat file, which needs a shell to start.
+        runInShell: Platform.isWindows,
+      );
+    } on ProcessException {
+      // Usually the program isn't installed or isn't on the PATH. Show a
+      // clear message instead of a stack trace.
+      throw FlavorPilotException(
+        '"$executable" was not found. Make sure it is installed and on your '
+        'PATH (run `$executable --version` to check).',
+      );
+    }
     return process.exitCode;
   }
 }

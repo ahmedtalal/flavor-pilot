@@ -84,26 +84,34 @@ class ReleaseCommand extends FlavorPilotCommand {
     final original = pubspec.readAsStringSync();
     final version = _bumpVersion(pubspec, original, bump);
 
-    // 2. Build.
+    // 2. Build. Unless it succeeds, the version change is undone, whatever
+    //    the reason: Flutter failed, couldn't start, or Ctrl+C was pressed.
+    //
+    //    Ctrl+C reaches both Flutter and flavorpilot. Listening for it keeps
+    //    flavorpilot alive, so Flutter stops and the `finally` below runs.
+    final ctrlC = ProcessSignal.sigint.watch().listen((_) {});
     final buildStart = DateTime.now();
-    final exitCode = await processRunner.run(
-      'flutter',
-      flutterArgs(
-        command: ['build', target],
-        flavor: flavor,
-        mode: BuildMode.release,
-        entryPoint: config.entryPointFor(flavor),
-        extra: [if (split) '--split-per-abi', ...passthroughArgs],
-      ),
-      workingDirectory: projectDir,
-    );
-    if (exitCode != 0) {
-      if (bump != VersionBump.none) {
+    var exitCode = 1;
+    try {
+      exitCode = await processRunner.run(
+        'flutter',
+        flutterArgs(
+          command: ['build', target],
+          flavor: flavor,
+          mode: BuildMode.release,
+          entryPoint: config.entryPointFor(flavor),
+          extra: [if (split) '--split-per-abi', ...passthroughArgs],
+        ),
+        workingDirectory: projectDir,
+      );
+    } finally {
+      await ctrlC.cancel();
+      if (exitCode != 0 && bump != VersionBump.none) {
         pubspec.writeAsStringSync(original);
-        logger.warn('Build failed, so the version change was undone.');
+        logger.warn('Build did not finish, so the version change was undone.');
       }
-      return exitCode;
     }
+    if (exitCode != 0) return exitCode;
 
     // 3. Copy the result to the output folder with a clear name. A split
     //    build makes one APK per CPU architecture, so the name includes it.

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flavorpilot/src/utils/exceptions.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
@@ -82,6 +83,24 @@ void main() {
     expect(code, 1);
     expect(readFile(dir, 'pubspec.yaml'), fixturePubspec);
     expect(Directory(p.join(dir, 'dist')).existsSync(), isFalse);
+  });
+
+  test('undoes the version change when flutter cannot start', () async {
+    final dir = createProject();
+    final missingFlutter = FakeProcessRunner(
+      onRun: (_) =>
+          throw const FlavorPilotException('"flutter" was not found.'),
+    );
+
+    final code = await runFlavorPilot(dir, [
+      'release',
+      'prod',
+      '--bump',
+      'patch',
+    ], processRunner: missingFlutter);
+
+    expect(code, 1);
+    expect(readFile(dir, 'pubspec.yaml'), fixturePubspec);
   });
 
   group('--split', () {
