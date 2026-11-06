@@ -73,6 +73,19 @@ class IconGenerator extends Generator {
     }
   }
 
+  /// Deletes the icons created for [flavor], on both platforms. Used by
+  /// `remove`, since a removed flavor is no longer in the config.
+  /// Icons not created by flavorpilot are kept.
+  void removeIcons(Flavor flavor, FileChanges changes) {
+    if (Directory(_appDir).existsSync()) {
+      final iconName = _androidIconName();
+      if (iconName != null) _updateAndroid(flavor, null, iconName, changes);
+    }
+    if (Directory(p.join(projectDir, 'ios', 'Runner.xcodeproj')).existsSync()) {
+      _updateIos(flavor, null, changes);
+    }
+  }
+
   /// Reads and checks the source PNG of [flavor].
   img.Image _loadIcon(Flavor flavor) {
     // `join` keeps an absolute path as it is.

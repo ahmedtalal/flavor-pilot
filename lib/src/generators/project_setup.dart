@@ -41,8 +41,14 @@ class ProjectSetup {
   ///
   /// Throws a FlavorPilotException if any generator can't update its files
   /// safely; in that case nothing should be written.
-  FileChanges plan(ProjectConfig config, {bool saveConfig = false}) {
-    final changes = FileChanges();
+  ///
+  /// Pass [changes] to add to changes planned earlier (used by `remove`).
+  FileChanges plan(
+    ProjectConfig config, {
+    bool saveConfig = false,
+    FileChanges? changes,
+  }) {
+    changes ??= FileChanges();
     if (saveConfig) {
       final yaml = const ConfigWriter().toYaml(config);
       // Load the YAML back first: this runs the same checks as every other
@@ -60,8 +66,12 @@ class ProjectSetup {
 
   /// Plans all changes for [config], then writes them in one go and prints
   /// a summary. If planning fails, no file is touched.
-  void apply(ProjectConfig config, {bool saveConfig = false}) {
-    final changes = plan(config, saveConfig: saveConfig)..apply();
+  void apply(
+    ProjectConfig config, {
+    bool saveConfig = false,
+    FileChanges? changes,
+  }) {
+    changes = plan(config, saveConfig: saveConfig, changes: changes)..apply();
     changes.notes.forEach(logger.success);
   }
 }

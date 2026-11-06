@@ -9,6 +9,7 @@ import 'commands/dotenv_command.dart';
 import 'commands/env_command.dart';
 import 'commands/init_command.dart';
 import 'commands/release_command.dart';
+import 'commands/remove_command.dart';
 import 'commands/run_command.dart';
 import 'commands/sync_command.dart';
 import 'utils/exceptions.dart';
@@ -46,6 +47,9 @@ class FlavorPilotRunner extends CommandRunner<int> {
     );
     addCommand(
       EnvCommand(logger: _logger, processRunner: runner, projectDir: dir),
+    );
+    addCommand(
+      RemoveCommand(logger: _logger, processRunner: runner, projectDir: dir),
     );
     addCommand(
       DotenvCommand(logger: _logger, processRunner: runner, projectDir: dir),
