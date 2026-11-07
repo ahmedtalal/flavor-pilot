@@ -1,3 +1,13 @@
+## Unreleased
+
+- Fix: running a command again no longer changes `ios/Runner.xcodeproj`.
+  The Xcode objects flavorpilot adds now get the same ids every time, so
+  Git only shows iOS changes when something really changed. The first run
+  after updating changes the ids one last time.
+- Commands now list only the files they actually changed, and say
+  "Everything was already up to date." when nothing changed. For example,
+  `signing` no longer lists iOS files.
+
 ## 0.5.0
 
 - New `remove` command removes a flavor and everything flavorpilot created

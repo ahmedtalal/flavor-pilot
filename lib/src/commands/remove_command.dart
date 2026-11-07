@@ -95,11 +95,12 @@ class RemoveCommand extends FlavorPilotCommand {
       return 0;
     }
 
+    final changed = changes.changedNotes;
     changes.apply();
     for (final path in removed) {
       logger.success('Removed $path');
     }
-    changes.notes.forEach(logger.success);
+    changed.forEach(logger.success);
     logger.success('Removed flavor "${flavor.name}".');
 
     for (final path in kept) {

@@ -72,11 +72,21 @@ void writePng(
     ..writeAsBytesSync(img.encodePng(image));
 }
 
-/// A logger that remembers warnings, so tests can check them.
+/// A logger that remembers warnings and success messages, so tests can
+/// check them.
 class RecordingLogger extends Logger {
   RecordingLogger() : super(useColors: false);
 
   final warnings = <String>[];
+
+  /// Every success message, in order.
+  final successes = <String>[];
+
+  @override
+  void success(String message) {
+    successes.add(message);
+    super.success(message);
+  }
 
   @override
   void warn(String message) {

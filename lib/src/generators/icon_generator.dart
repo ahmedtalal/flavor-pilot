@@ -177,10 +177,11 @@ class IconGenerator extends Generator {
 
     if (source == null) {
       if (!isOurs) return;
+      // Deletions first: a note describes the changes planned before it.
+      targets.keys.forEach(changes.deleteFile);
       changes
         ..deleteFile(marker.path)
         ..note('Removed the Android icons of "${flavor.name}"');
-      targets.keys.forEach(changes.deleteFile);
       return;
     }
 

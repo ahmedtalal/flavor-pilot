@@ -67,13 +67,18 @@ class ProjectSetup {
   }
 
   /// Plans all changes for [config], then writes them in one go and prints
-  /// a summary. If planning fails, no file is touched.
+  /// a summary of what really changed. If planning fails, no file is
+  /// touched.
   void apply(
     ProjectConfig config, {
     bool saveConfig = false,
     FileChanges? changes,
   }) {
-    changes = plan(config, saveConfig: saveConfig, changes: changes)..apply();
-    changes.notes.forEach(logger.success);
+    changes = plan(config, saveConfig: saveConfig, changes: changes);
+    // Worked out before writing, while the old files are still there.
+    final changed = changes.changedNotes;
+    changes.apply();
+    changed.forEach(logger.success);
+    if (changed.isEmpty) logger.success('Everything was already up to date.');
   }
 }

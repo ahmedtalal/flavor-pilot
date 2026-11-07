@@ -1,4 +1,4 @@
-import 'dart:math';
+import 'dart:convert';
 
 import '../../models/flavor.dart';
 import '../../utils/exceptions.dart';
@@ -22,11 +22,18 @@ import '../../utils/exceptions.dart';
 /// 24-character id, written like `97C147061CF9000F007C117D /* Debug */`.
 /// Lines are indented with tabs, and the regexes below rely on that exact
 /// indentation, which Xcode always writes the same way.
+///
+/// The ids of the objects added here are stable: each one is worked out from
+/// what the object is (e.g. "the Debug-development configuration of this
+/// list"), so running again gives exactly the same file and Git shows no
+/// changes.
 class PbxprojEditor {
-  PbxprojEditor(this._text, {Random? random}) : _random = random ?? Random();
+  PbxprojEditor(this._text);
 
   String _text;
-  final Random _random;
+
+  /// Ids given out during this run, so two objects never share one.
+  final _usedIds = <String>{};
 
   /// The edited project file text.
   String get text => _text;
@@ -172,10 +179,12 @@ class PbxprojEditor {
 
         for (final flavor in flavors) {
           final name = configName(kind, flavor);
-          final id = _newId();
+          // The base configuration's id already tells this list and build
+          // type apart from every other one.
+          final id = _stableId('config $baseId ${flavor.name}');
           String? fileRefId;
           if (isApp) {
-            fileRefId = _newId();
+            fileRefId = _stableId('xcconfig $name');
             newFileRefs.writeln(_fileRefLine(fileRefId, name));
             newGroupChildren.writeln(
               '\t\t\t\t$fileRefId /* $name.xcconfig */,',
@@ -303,13 +312,29 @@ class PbxprojEditor {
     _text = _text.replaceRange(index, index, content);
   }
 
-  /// A new random 24-character id that doesn't exist in the file yet.
-  String _newId() {
-    const hex = '0123456789ABCDEF';
-    while (true) {
-      final id = List.generate(24, (_) => hex[_random.nextInt(16)]).join();
-      if (!_text.contains(id)) return id;
+  /// A 24-character id for the object described by [key]: always the same
+  /// for the same [key]. In the very unlikely case that it is already taken,
+  /// the next free variant is used.
+  String _stableId(String key) {
+    for (var attempt = 0; ; attempt++) {
+      final input = 'flavorpilot $key${attempt == 0 ? '' : ' #$attempt'}';
+      // Three 32-bit hashes with different prefixes give the 96 bits (24 hex
+      // characters) an Xcode id has.
+      final id = [
+        for (var part = 0; part < 3; part++)
+          _fnv1a('$part $input').toRadixString(16).padLeft(8, '0'),
+      ].join().toUpperCase();
+      if (!_text.contains(id) && _usedIds.add(id)) return id;
     }
+  }
+
+  /// The 32-bit FNV-1a hash of [text]: small, fast and always the same.
+  static int _fnv1a(String text) {
+    var hash = 0x811c9dc5;
+    for (final byte in utf8.encode(text)) {
+      hash = ((hash ^ byte) * 0x01000193) & 0xffffffff;
+    }
+    return hash;
   }
 
   /// Quotes a pbxproj string value, escaping `\` and `"`.

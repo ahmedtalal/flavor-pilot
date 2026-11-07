@@ -73,4 +73,52 @@ void main() {
       ..note('second');
     expect(changes.notes, ['first', 'second']);
   });
+
+  group('changedNotes', () {
+    test('leaves out notes about files that would not change', () {
+      final dir = createEmptyDir();
+      writeFile(dir, 'same.txt', 'same');
+      writeFile(dir, 'old.txt', 'old');
+
+      final changes = FileChanges()
+        ..write(p.join(dir, 'same.txt'), 'same')
+        ..note('same')
+        ..write(p.join(dir, 'old.txt'), 'new')
+        ..note('changed')
+        ..write(p.join(dir, 'missing.txt'), 'x')
+        ..note('created')
+        ..note('no files');
+
+      expect(changes.changedNotes, ['changed', 'created', 'no files']);
+      expect(changes.notes, hasLength(4));
+    });
+
+    test('a folder emptied and filled with the same files is unchanged', () {
+      final dir = createEmptyDir();
+      writeFile(dir, 'out/a.txt', 'a');
+      final folder = p.join(dir, 'out');
+
+      FileChanges same() => FileChanges()
+        ..deleteDirectory(folder)
+        ..write(p.join(folder, 'a.txt'), 'a')
+        ..note('rewrote out/');
+      expect(same().changedNotes, isEmpty);
+
+      writeFile(dir, 'out/stale.txt', 'old flavor');
+      expect(same().changedNotes, ['rewrote out/']);
+    });
+
+    test('deleting a file only counts when it exists', () {
+      final dir = createEmptyDir();
+      writeFile(dir, 'there.txt', 'x');
+
+      final changes = FileChanges()
+        ..deleteFile(p.join(dir, 'gone.txt'))
+        ..note('gone')
+        ..deleteFile(p.join(dir, 'there.txt'))
+        ..note('there');
+
+      expect(changes.changedNotes, ['there']);
+    });
+  });
 }

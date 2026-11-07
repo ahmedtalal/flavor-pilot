@@ -1,6 +1,4 @@
 import 'dart:io';
-import 'dart:math';
-
 import 'package:flavorpilot/flavorpilot.dart';
 import 'package:flavorpilot/src/generators/ios/pbxproj_editor.dart';
 import 'package:test/test.dart';
@@ -26,8 +24,8 @@ void main() {
   ];
 
   /// Runs a full generation on [text], like `init` and `sync` do.
-  String generate(String text, {int seed = 1}) {
-    return (PbxprojEditor(text, random: Random(seed))
+  String generate(String text) {
+    return (PbxprojEditor(text)
           ..removeGenerated()
           ..checkNoConflicts(flavors)
           ..addFlavors(flavors, defaultAppName: 'Sample'))
@@ -36,10 +34,6 @@ void main() {
 
   /// Number of times [pattern] appears in [text].
   int count(String text, String pattern) => pattern.allMatches(text).length;
-
-  /// Replaces Xcode ids, which are random for every new object.
-  String maskIds(String text) =>
-      text.replaceAll(RegExp(r'\b[0-9A-F]{24}\b'), 'ID');
 
   /// Every XCBuildConfiguration block in [text].
   Iterable<String> configEntries(String text) => RegExp(
@@ -121,7 +115,6 @@ void main() {
     ];
     final text = (PbxprojEditor(
       original,
-      random: Random(1),
     )..addFlavors(withIcon, defaultAppName: 'Sample')).text;
 
     // Debug, Release and Profile of the Runner target only.
@@ -144,7 +137,7 @@ void main() {
 
   test('every configuration has at most one FLAVOR_APP_NAME', () {
     // Regression: re-running copied the base's app name into flavor configs.
-    final text = generate(generate(original, seed: 1), seed: 2);
+    final text = generate(generate(original));
 
     for (final entry in configEntries(text)) {
       expect(
@@ -156,11 +149,24 @@ void main() {
     expect(count(text, 'FLAVOR_APP_NAME = "Sample DEV";'), 3);
   });
 
-  test('running again gives the same project (apart from new ids)', () {
-    final once = generate(original, seed: 1);
-    final twice = generate(once, seed: 2);
+  test('running again gives exactly the same project, ids included', () {
+    // Regression: new random ids made every run change the file, so Git
+    // showed iOS changes after commands that had nothing to do with iOS.
+    final once = generate(original);
+    final twice = generate(once);
 
-    expect(maskIds(twice), maskIds(once));
+    expect(twice, once);
+  });
+
+  test('every object in the project has its own id', () {
+    // Each object is declared once, at the start of its line.
+    final declared = RegExp(
+      r'^\t\t([0-9A-F]{24}) ',
+      multiLine: true,
+    ).allMatches(generate(original)).map((m) => m[1]).toList();
+
+    expect(declared, isNotEmpty);
+    expect(declared.toSet(), hasLength(declared.length));
   });
 
   test('removeGenerated removes every object it added', () {

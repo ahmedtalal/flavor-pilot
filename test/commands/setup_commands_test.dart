@@ -497,4 +497,46 @@ flavors:
       expect(await runFlavorPilot(dir, ['doctor']), 1);
     });
   });
+
+  group('only real changes are reported', () {
+    test('a second sync changes no file and says so', () async {
+      final dir = createTempProject();
+      await runFlavorPilot(dir, ['init', '--yes']);
+      final pbxproj = readFile(dir, 'ios/Runner.xcodeproj/project.pbxproj');
+      final logger = RecordingLogger();
+
+      await FlavorPilotRunner(
+        logger: logger,
+        processRunner: FakeProcessRunner(),
+        projectDir: dir,
+      ).run(['sync']);
+
+      // Regression: random Xcode ids changed the file on every run.
+      expect(readFile(dir, 'ios/Runner.xcodeproj/project.pbxproj'), pbxproj);
+      expect(logger.successes, ['Everything was already up to date.']);
+    });
+
+    test('an Android-only change reports no iOS files', () async {
+      final dir = createTempProject();
+      await runFlavorPilot(dir, ['init', '--yes']);
+      writeFile(
+        dir,
+        'flavorpilot.yaml',
+        readFile(dir, 'flavorpilot.yaml').replaceFirst(
+          'android_id: "com.example.sample.dev"',
+          'android_id: "com.example.sample.dev2"',
+        ),
+      );
+      final logger = RecordingLogger();
+
+      await FlavorPilotRunner(
+        logger: logger,
+        processRunner: FakeProcessRunner(),
+        projectDir: dir,
+      ).run(['sync']);
+
+      expect(logger.successes, hasLength(1));
+      expect(logger.successes.single, contains('build.gradle.kts'));
+    });
+  });
 }
