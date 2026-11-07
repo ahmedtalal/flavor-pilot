@@ -419,7 +419,7 @@ android {
       expect(exists(dir, 'android/keys/development.jks'), isTrue);
       expect(
         logger.warnings.join(),
-        contains('android/keys/development.properties is no longer'),
+        contains('Kept the signing key android/keys/development.properties'),
       );
     });
   });

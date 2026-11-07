@@ -77,7 +77,7 @@ void main() {
     expect(exists(dir, androidIcon), isFalse);
   });
 
-  test('keeps main files and .env files that hold values', () async {
+  test('deletes the main file and .env file, even when edited', () async {
     final dir = createTempProject();
     writeFile(dir, 'flavorpilot.yaml', '''
 main_mode: multiple
@@ -86,13 +86,42 @@ flavors:
   qa: {alias: q}
 ''');
     await runFlavorPilot(dir, ['dotenv']);
+    writeFile(dir, 'lib/main_qa.dart', '// my own qa setup\n');
     writeFile(dir, '.env.qa', 'API_KEY=secret\n');
 
     await runFlavorPilot(dir, ['remove', 'qa', '--yes']);
 
-    expect(exists(dir, 'lib/main_qa.dart'), isTrue);
-    expect(readFile(dir, '.env.qa'), 'API_KEY=secret\n');
+    expect(exists(dir, 'lib/main_qa.dart'), isFalse);
+    expect(exists(dir, '.env.qa'), isFalse);
     expect(readFile(dir, '.gitignore'), isNot(contains('.env.qa')));
+    // Other flavors keep theirs.
+    expect(exists(dir, 'lib/main_development.dart'), isTrue);
+    expect(exists(dir, '.env.development'), isTrue);
+  });
+
+  test('the question warns that everything is deleted', () async {
+    final dir = createTempProject();
+    writeFile(dir, 'flavorpilot.yaml', '''
+main_mode: multiple
+flavors:
+  development: {}
+  qa: {}
+''');
+    await runFlavorPilot(dir, ['sync']);
+    final logger = RecordingLogger();
+
+    await (CommandRunner<int>('flavorpilot', 'test')..addCommand(
+          RemoveCommand(
+            logger: logger,
+            processRunner: FakeProcessRunner(),
+            projectDir: dir,
+            readLine: () => 'n',
+          ),
+        ))
+        .run(['remove', 'qa']);
+
+    expect(logger.warnings.single, contains('deletes everything'));
+    expect(exists(dir, 'lib/main_qa.dart'), isTrue);
   });
 
   test('deletes an .env file that has no values', () async {

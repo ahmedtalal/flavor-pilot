@@ -1,3 +1,10 @@
+## Unreleased
+
+- `remove` now deletes everything for the flavor, including
+  `lib/main_<flavor>.dart` and its `.env` file, even if they were edited. Its
+  question warns about this and lists every file first. Only a signing key is
+  kept.
+
 ## 0.5.1
 
 - Fix: running a command again no longer changes `ios/Runner.xcodeproj`.

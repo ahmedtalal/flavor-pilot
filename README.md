@@ -384,10 +384,10 @@ flavorpilot signing --keystore ~/keys/old.jks --alias release
 flavorpilot remove <flavor> [--yes]
 ```
 
-Removes the flavor from `flavorpilot.yaml` and everything flavorpilot created
-for it: the Android flavor, the iOS configurations and scheme, its icons, and
-the VS Code and Android Studio run configurations. It lists what it will remove
-and asks you to confirm first.
+Removes the flavor from `flavorpilot.yaml` and everything for it: the Android
+flavor, the iOS configurations and scheme, its icons, its main file and `.env`
+file, and the VS Code and Android Studio run configurations. It lists what it
+will delete and asks you to confirm first.
 
 | Option | Meaning |
 | --- | --- |
@@ -398,12 +398,14 @@ flavorpilot remove qa
 flavorpilot remove staging --yes
 ```
 
-Files that may hold your own work are **kept**, and listed when it finishes:
+> ⚠️ It deletes **everything** for the flavor, including
+> `lib/main_<flavor>.dart` and its `.env` file, even if you added your own
+> code or values to them. Copy anything you want to keep first. The question
+> lists every file before anything is deleted.
 
-- `lib/main_<flavor>.dart` (one main file per flavor mode).
-- The flavor's `.env` file, if it has values in it. It is no longer in
-  `.gitignore`, so delete it or move its values before your next commit. An
-  `.env` file with no values is deleted.
+Only the flavor's own **signing key** is kept, because losing a key can stop
+you from updating your app. It is no longer in `.gitignore`, so move it
+somewhere safe before your next commit.
 
 The last flavor can't be removed. Like `add`, it rewrites `flavorpilot.yaml`,
 so comments you wrote in it are removed.
