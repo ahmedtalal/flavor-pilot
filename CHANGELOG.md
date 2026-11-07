@@ -1,4 +1,4 @@
-## Unreleased
+## 0.5.1
 
 - Fix: running a command again no longer changes `ios/Runner.xcodeproj`.
   The Xcode objects flavorpilot adds now get the same ids every time, so
