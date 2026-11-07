@@ -13,7 +13,8 @@ class ProcessRunner {
   final Logger _logger;
 
   /// Runs [executable] with [arguments] inside [workingDirectory] and returns
-  /// its exit code.
+  /// its exit code. [environment] adds variables for the program, e.g. a
+  /// password that shouldn't appear in the command line.
   ///
   /// The child process shares this terminal's input and output, so Flutter's
   /// live output and its interactive keys (like `r` for hot reload) work
@@ -22,6 +23,7 @@ class ProcessRunner {
     String executable,
     List<String> arguments, {
     String? workingDirectory,
+    Map<String, String>? environment,
   }) async {
     _logger.command([executable, ...arguments].join(' '));
 
@@ -31,6 +33,7 @@ class ProcessRunner {
         executable,
         arguments,
         workingDirectory: workingDirectory,
+        environment: environment,
         mode: ProcessStartMode.inheritStdio,
         // On Windows `flutter` is a .bat file, which needs a shell to start.
         runInShell: Platform.isWindows,

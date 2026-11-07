@@ -82,7 +82,13 @@ class ConfigLoader {
     _checkUniqueNames(flavors);
     _checkEnvMatches(flavors);
 
-    return ProjectConfig(flavors: flavors, mainMode: mainMode);
+    final signing = root['android_signing'];
+    _checkSigningPath('android_signing', signing);
+    return ProjectConfig(
+      flavors: flavors,
+      mainMode: mainMode,
+      androidSigning: signing as String?,
+    );
   }
 
   /// Reads `main_mode`. Defaults to [MainMode.single] when it's missing.
@@ -128,6 +134,10 @@ class ConfigLoader {
         );
       }
       _checkEnvFile(name, data['env_file']);
+      _checkSigningPath(
+        'Flavor "$name": android_signing',
+        data['android_signing'],
+      );
       flavors.add(Flavor.fromMap(name, data));
     }
     return flavors;
@@ -146,6 +156,17 @@ class ConfigLoader {
       throw FlavorPilotException(
         'Flavor "$flavor": env_file must be a path inside the project, '
         'e.g. .env.$flavor.',
+      );
+    }
+  }
+
+  /// Checks an `android_signing` value: the path of a `.properties` file.
+  void _checkSigningPath(String what, Object? path) {
+    if (path == null) return;
+    if (path is! String || path.trim().isEmpty) {
+      throw FlavorPilotException(
+        '$what must be the path of a .properties file, e.g. '
+        'android/keys/upload.properties.',
       );
     }
   }

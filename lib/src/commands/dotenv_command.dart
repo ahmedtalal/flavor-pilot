@@ -1,5 +1,4 @@
 import '../generators/project_setup.dart';
-import '../models/project_config.dart';
 import '../utils/env_defaults.dart';
 import 'flavorpilot_command.dart';
 
@@ -36,10 +35,7 @@ class DotenvCommand extends FlavorPilotCommand {
     }
 
     ProjectSetup(projectDir: projectDir, logger: logger).apply(
-      ProjectConfig(
-        flavors: config.flavors.map(withDefaultEnvFile).toList(),
-        mainMode: config.mainMode,
-      ),
+      config.copyWith(flavors: config.flavors.map(withDefaultEnvFile).toList()),
       saveConfig: true,
     );
     logger

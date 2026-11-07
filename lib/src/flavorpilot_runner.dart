@@ -11,6 +11,7 @@ import 'commands/init_command.dart';
 import 'commands/release_command.dart';
 import 'commands/remove_command.dart';
 import 'commands/run_command.dart';
+import 'commands/signing_command.dart';
 import 'commands/sync_command.dart';
 import 'utils/exceptions.dart';
 import 'utils/logger.dart';
@@ -50,6 +51,9 @@ class FlavorPilotRunner extends CommandRunner<int> {
     );
     addCommand(
       RemoveCommand(logger: _logger, processRunner: runner, projectDir: dir),
+    );
+    addCommand(
+      SigningCommand(logger: _logger, processRunner: runner, projectDir: dir),
     );
     addCommand(
       DotenvCommand(logger: _logger, processRunner: runner, projectDir: dir),

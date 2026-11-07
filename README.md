@@ -31,6 +31,7 @@ flavorpilot build prod --target appbundle
 - [Settings per flavor: `env`](#settings-per-flavor-env)
 - [`.env` files per flavor](#env-files-per-flavor)
 - [Icons per flavor](#icons-per-flavor)
+- [Android signing keys](#android-signing-keys)
 - [The `flavorpilot.yaml` file](#the-flavorpilotyaml-file)
 - [Common tasks](#common-tasks)
 - [Safety: what flavorpilot will and won't do](#safety-what-flavorpilot-will-and-wont-do)
@@ -356,6 +357,57 @@ new flavor's `base_url` before using it**.
 
 > `add` rewrites `flavorpilot.yaml`, so comments you wrote in it are removed.
 
+### `signing`: set up the Android signing key
+
+```sh
+flavorpilot signing [<flavor>] [--keystore <path>] [--alias <name>]
+```
+
+Sets up the key that Android release builds are signed with, which Google
+Play needs. Without a flavor, **one key is used by every flavor**. With a
+flavor, that flavor gets its own key. See [Android signing keys](#android-signing-keys).
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `--keystore` | | Use a keystore (`.jks`) you already have, instead of creating a new key. |
+| `--alias` | `upload` | Name of the key inside the keystore. |
+
+```sh
+flavorpilot signing                          # one new key for every flavor
+flavorpilot signing prod                     # a separate key for production
+flavorpilot signing --keystore ~/keys/old.jks --alias release
+```
+
+### `remove`: remove a flavor
+
+```sh
+flavorpilot remove <flavor> [--yes]
+```
+
+Removes the flavor from `flavorpilot.yaml` and everything flavorpilot created
+for it: the Android flavor, the iOS configurations and scheme, its icons, and
+the VS Code and Android Studio run configurations. It lists what it will remove
+and asks you to confirm first.
+
+| Option | Meaning |
+| --- | --- |
+| `-y`, `--yes` | Remove without asking. |
+
+```sh
+flavorpilot remove qa
+flavorpilot remove staging --yes
+```
+
+Files that may hold your own work are **kept**, and listed when it finishes:
+
+- `lib/main_<flavor>.dart` (one main file per flavor mode).
+- The flavor's `.env` file, if it has values in it. It is no longer in
+  `.gitignore`, so delete it or move its values before your next commit. An
+  `.env` file with no values is deleted.
+
+The last flavor can't be removed. Like `add`, it rewrites `flavorpilot.yaml`,
+so comments you wrote in it are removed.
+
 ### `env`: add example settings to an existing setup
 
 ```sh
@@ -528,6 +580,102 @@ gets its own `.env` file automatically.
   `flavorpilot.yaml` and become fields on `AppFlavor`; `env_file` values stay
   in your `.env` files and are read with `String.fromEnvironment`.
 
+## Android signing keys
+
+Every Android app must be signed to be installed. Flutter signs builds with a
+**debug key** that is different on every computer, so:
+
+- testers can't update an app built on another computer (they must uninstall
+  it first), and
+- Google Play rejects it.
+
+flavorpilot sets up **your own key** so every release build is signed the same
+way, on every computer and in CI.
+
+**1. Create the key:**
+
+```sh
+flavorpilot signing
+```
+
+```text
+Key password (at least 6 characters):
+Repeat the password:
+Your name or company (stored in the key) [My app]:
+✓ Release builds of every flavor are now signed with this key.
+```
+
+This creates two files and keeps them out of Git:
+
+| File | What it is |
+| --- | --- |
+| `android/keys/upload.jks` | The key itself. |
+| `android/keys/upload.properties` | Its passwords and alias. |
+
+It needs Java's `keytool`, which comes with Android Studio; flavorpilot finds
+it there, in `JAVA_HOME`, or on your `PATH`. Already have a key? Use
+`flavorpilot signing --keystore path/to/key.jks` instead.
+
+**2. Build as usual:**
+
+```sh
+flavorpilot release prod --target appbundle    # signed with your key
+```
+
+Debug builds (`flavorpilot run dev`) keep using the debug key, as before.
+
+> ⚠️ **Back up `android/keys/`** (the key and its password) somewhere safe,
+> outside the project, like a password manager. If you lose the key, you may
+> not be able to update your app on Google Play.
+
+### One key for every flavor, or one per flavor
+
+One key for every flavor is the simplest choice and fine for most apps: each
+flavor has its own app id, so the stores treat them as separate apps anyway.
+To give a flavor its own key, for example to keep the production key with
+fewer people:
+
+```sh
+flavorpilot signing prod
+```
+
+`flavorpilot.yaml` then looks like this:
+
+```yaml
+android_signing: "android/keys/upload.properties"      # every flavor
+flavors:
+  production:
+    android_signing: "android/keys/production.properties"  # this one only
+```
+
+### Teammates and CI
+
+Everyone who builds releases needs the same files in `android/keys/`. Share
+them privately, never through Git. In CI, write them from your CI secrets
+before building:
+
+```sh
+mkdir -p android/keys
+echo "$UPLOAD_KEYSTORE_BASE64" | base64 --decode > android/keys/upload.jks
+echo "$UPLOAD_PROPERTIES" > android/keys/upload.properties
+flavorpilot release prod --target appbundle
+```
+
+Without the files, debug builds and plain `flutter build` still work (they use
+the debug key), but `flavorpilot release` stops with a clear message, so an
+unsigned build never reaches the store by mistake.
+
+### Good to know
+
+- Passwords can't contain `\` or start or end with a space, so every tool
+  reads them the same way.
+- The `.properties` file uses Flutter's usual `key.properties` format.
+  `storeFile` is relative to the `.properties` file.
+- To make it work, flavorpilot adds a short marked block at the **end** of
+  `android/app/build.gradle(.kts)`. It stops the release build type from
+  forcing the debug key, which Flutter's template does and which would win
+  over a flavor's key.
+
 ## Icons per flavor
 
 Give a flavor its own icon so you can tell the builds apart on your device.
@@ -588,6 +736,7 @@ flavors:
 | Key | Required | Meaning |
 | --- | --- | --- |
 | `main_mode` | No (default `single`) | `single`: one `lib/main.dart`. `multiple`: one `lib/main_<flavor>.dart` per flavor. |
+| `android_signing` (top level) | No | Signing key of every flavor's Android release builds. See [Android signing keys](#android-signing-keys). |
 | `flavors` | Yes | One entry per flavor. The key is the flavor name used by `--flavor`. |
 | `alias` | No | Short name for commands. Must be unique across all names and aliases. |
 | `app_name` | No | Name on the device. Defaults to the flavor name. |
@@ -596,6 +745,7 @@ flavors:
 | `icon` | No | Path to the flavor's icon. See [Icons per flavor](#icons-per-flavor). |
 | `env` | No | Custom settings for the flavor. See [Settings per flavor](#settings-per-flavor-env). |
 | `env_file` | No | Path of the flavor's `.env` file, e.g. `.env.development`. See [`.env` files per flavor](#env-files-per-flavor). |
+| `android_signing` | No | This flavor's own signing key, instead of the top-level one. See [Android signing keys](#android-signing-keys). |
 
 Rules: flavor names start with a lowercase letter and contain only letters
 and digits; no name or alias can appear twice. See
@@ -610,13 +760,12 @@ and digits; no name or alias can appear twice. See
 
 ### Remove a flavor
 
-1. Delete its entry from `flavorpilot.yaml`.
-2. Run `flavorpilot sync`.
-3. Delete what `sync` doesn't remove on purpose (they may contain your own
-   changes): `ios/Runner.xcodeproj/xcshareddata/xcschemes/<flavor>.xcscheme`,
-   `.run/<flavor>.run.xml` and, in multiple mode, `lib/main_<flavor>.dart`.
-   If the flavor had an icon, also delete `android/app/src/<flavor>` and
-   `ios/Runner/Assets.xcassets/AppIcon-<flavor>.appiconset`.
+```sh
+flavorpilot remove qa
+```
+
+See [`remove`](#remove-remove-a-flavor). Then search your code for
+`AppFlavor.<flavor>` and update it.
 
 ### Added your first CocoaPods plugin after `init`
 
@@ -635,7 +784,8 @@ flavorpilot doctor                      # fail fast if setup is out of sync
 flavorpilot release prod --target appbundle --bump none
 ```
 
-Use `--bump none` if your CI sets the version itself.
+Use `--bump none` if your CI sets the version itself. If you use a signing key,
+write its files first; see [Teammates and CI](#teammates-and-ci).
 
 ### Moving from hand-made flavors
 
@@ -674,6 +824,7 @@ Run `git clean -nd` first to see what it would remove.
   `flavorpilot:end` comments, and its Xcode configurations carry a
   `FLAVORPILOT = YES` build setting. That's how running it again replaces
   its own work instead of duplicating it.
+- **Never replaces or deletes a signing key**, not even with `remove`.
 - **Shows what it runs.** `run`, `build` and `release` print the exact
   `flutter` command before running it.
 
@@ -693,6 +844,9 @@ Don't edit the marked blocks by hand: `sync` will replace them. Change
 | `Invalid flavor name "…"` | Use a lowercase first letter and only letters and digits. |
 | `.vscode/launch.json has comments or invalid JSON` (warning) | flavorpilot can't safely edit a launch.json with comments, so it skips it. Remove the comments and run `flavorpilot sync`, or add the entries yourself. |
 | `lib/flavors.dart already exists and was not created by flavorpilot` (warning) | You have your own `flavors.dart`; it was left alone. Rename yours to use the generated `AppFlavor`. |
+| `Can't sign "…": … was not found` | The flavor's signing key files are missing on this computer. Copy them from your team into `android/keys/`, or see [Android signing keys](#android-signing-keys). |
+| `"…" will be signed with the debug key` (warning) | A release `build` can't find the key, so Gradle uses the debug key. Fine for testing; Google Play rejects it. |
+| `keytool … was not found` | Install Android Studio or a JDK, or set `JAVA_HOME`. |
 | `Unsupported version "…" in pubspec.yaml` | `release` needs a version like `1.2.3+4` in `pubspec.yaml`. |
 | `env key "…" is missing from: …` | Every flavor needs the same `env` keys. Add the key to the flavors listed. |
 | `env key "…" has different types across flavors` | Use the same type in every flavor. Check for a number or `true` written in quotes. |

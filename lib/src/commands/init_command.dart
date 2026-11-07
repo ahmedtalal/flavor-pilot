@@ -101,14 +101,15 @@ class InitCommand extends FlavorPilotCommand {
   /// ask about.
   void _warnAboutLostSettings() {
     try {
-      final hasExtras = configLoader
-          .load(projectDir)
-          .flavors
-          .any((f) => f.env.isNotEmpty || f.icon != null);
-      if (hasExtras) {
+      final old = configLoader.load(projectDir);
+      final hasExtras = old.flavors.any(
+        (f) => f.env.isNotEmpty || f.icon != null || f.envFile != null,
+      );
+      if (hasExtras || old.usesSigning) {
         logger.warn(
-          '--force replaces ${ConfigLoader.fileName}, so its env values and '
-          'icons will be lost.',
+          '--force replaces ${ConfigLoader.fileName}, so its env values, '
+          'icons, env_file and android_signing settings will be lost. The '
+          'files they point to (.env files, signing keys) are kept.',
         );
       }
     } on FlavorPilotException {

@@ -19,6 +19,13 @@ import 'generator.dart';
 /// The Gradle block is wrapped in `// flavorpilot:start` and
 /// `// flavorpilot:end` comments. On the next run the old block is removed
 /// and a fresh one is written, so the file never gets duplicates.
+///
+/// When flavors use signing keys (`android_signing`), the block also loads
+/// them, and a second small block at the end of the file stops the release
+/// build type from forcing the debug key. Flutter's template sets that, and
+/// a build type's key wins over a flavor's. A key file that's missing (for
+/// example on a teammate's computer) falls back to the debug key, so builds
+/// still work; `flavorpilot release` refuses to build without it.
 class AndroidGenerator extends Generator {
   AndroidGenerator({required super.projectDir, required super.logger});
 
@@ -95,12 +102,19 @@ class AndroidGenerator extends Generator {
     // Insert on the line right after `android {`. Inserting after the
     // newline (not before it) means removing the block later restores the
     // file exactly, so repeated runs don't pile up blank lines.
-    final block = isKotlin ? _kotlinBlock(config) : _groovyBlock(config);
+    final keys = _signingKeys(config);
+    final block = isKotlin
+        ? _kotlinBlock(config, keys)
+        : _groovyBlock(config, keys);
     final lineEnd = content.indexOf('\n', match.end);
     final at = lineEnd == -1 ? content.length : lineEnd + 1;
-    final updated =
+    var updated =
         '${content.substring(0, at)}${lineEnd == -1 ? '\n' : ''}$block'
         '${content.substring(at)}';
+    if (keys.isNotEmpty) {
+      if (!updated.endsWith('\n')) updated += '\n';
+      updated += isKotlin ? _kotlinReleaseBlock : _groovyReleaseBlock;
+    }
     changes
       ..write(file.path, updated)
       ..note(
@@ -109,14 +123,143 @@ class AndroidGenerator extends Generator {
       );
   }
 
+  /// Gradle names for each signing key file, in the order first used,
+  /// e.g. `{'android/keys/upload.properties': 'flavorpilotKey0'}`.
+  Map<String, String> _signingKeys(ProjectConfig config) {
+    final keys = <String, String>{};
+    for (final flavor in config.flavors) {
+      final path = config.signingFor(flavor);
+      if (path != null) {
+        keys.putIfAbsent(path, () => 'flavorpilotKey${keys.length}');
+      }
+    }
+    return keys;
+  }
+
+  /// [path] (from the project root, or absolute) as Gradle's `file()` in
+  /// `android/app` reads it.
+  String _gradlePath(String path) {
+    if (p.isAbsolute(path)) return _escape(path);
+    final relative = p.relative(
+      p.join(projectDir, path),
+      from: p.join(projectDir, 'android', 'app'),
+    );
+    return _escape(p.posix.joinAll(p.split(relative)));
+  }
+
+  /// The flavor's `signingConfig` value, in Kotlin or Groovy.
+  String _signingValue(
+    ProjectConfig config,
+    Flavor flavor,
+    Map<String, String> keys, {
+    required bool kotlin,
+  }) {
+    final debug = kotlin
+        ? 'signingConfigs.getByName("debug")'
+        : 'signingConfigs.debug';
+    final key = keys[config.signingFor(flavor)];
+    return key == null ? debug : 'signingConfigs.findByName("$key") ?: $debug';
+  }
+
+  /// Kotlin code that loads each signing key, if its file exists.
+  String _kotlinSigning(Map<String, String> keys) {
+    final buffer = StringBuffer()
+      ..writeln(
+        '    // Signing keys from android_signing in flavorpilot.yaml. A',
+      )
+      ..writeln('    // missing key file falls back to the debug key.');
+    keys.forEach((path, name) {
+      final props = '${name}Properties';
+      // Read as plain `key=value` lines: inside `android {}`, `java` means
+      // Gradle's Java extension, so `java.util.Properties` doesn't compile.
+      buffer
+        ..writeln('    val $name = file("${_gradlePath(path)}")')
+        ..writeln('    if ($name.exists()) {')
+        ..writeln('        val $props = $name.readLines()')
+        ..writeln(
+          '            .filter { "=" in it && !it.trimStart().startsWith("#") }',
+        )
+        ..writeln(
+          '            .associate { it.substringBefore("=").trim() to '
+          'it.substringAfter("=").trim() }',
+        )
+        ..writeln('        signingConfigs.create("$name") {')
+        ..writeln(
+          '            storeFile = $name.parentFile.resolve('
+          '$props.getValue("storeFile"))',
+        )
+        ..writeln(
+          '            storePassword = $props.getValue("storePassword")',
+        )
+        ..writeln('            keyAlias = $props.getValue("keyAlias")')
+        ..writeln('            keyPassword = $props.getValue("keyPassword")')
+        ..writeln('        }')
+        ..writeln('    }');
+    });
+    return buffer.toString();
+  }
+
+  /// Groovy code that loads each signing key, if its file exists.
+  String _groovySigning(Map<String, String> keys) {
+    final buffer = StringBuffer()
+      ..writeln(
+        '    // Signing keys from android_signing in flavorpilot.yaml. A',
+      )
+      ..writeln('    // missing key file falls back to the debug key.');
+    keys.forEach((path, name) {
+      final props = '${name}Properties';
+      buffer
+        ..writeln('    def $name = file("${_gradlePath(path)}")')
+        ..writeln('    if ($name.exists()) {')
+        // Same plain `key=value` reading as the Kotlin version.
+        ..writeln(
+          '        def $props = $name.readLines()'
+          '.findAll { it.contains("=") && !it.trim().startsWith("#") }',
+        )
+        ..writeln(
+          '            .collectEntries { [(it.split("=", 2)[0].trim()): '
+          'it.split("=", 2)[1].trim()] }',
+        )
+        ..writeln('        signingConfigs.create("$name") {')
+        ..writeln(
+          '            storeFile $name.parentFile.toPath().resolve('
+          '$props["storeFile"]).toFile()',
+        )
+        ..writeln('            storePassword $props["storePassword"]')
+        ..writeln('            keyAlias $props["keyAlias"]')
+        ..writeln('            keyPassword $props["keyPassword"]')
+        ..writeln('        }')
+        ..writeln('    }');
+    });
+    return buffer.toString();
+  }
+
+  /// Added at the end of `build.gradle.kts` when signing keys are used. It
+  /// runs after the developer's `buildTypes`, so release builds use each
+  /// flavor's key instead of the debug key Flutter's template sets.
+  static const _kotlinReleaseBlock =
+      '$_startMarker (generated, edit flavorpilot.yaml instead)\n'
+      '// Release builds use each flavor\'s signing key (see productFlavors).\n'
+      'android.buildTypes.getByName("release").signingConfig = null\n'
+      '$_endMarker\n';
+
+  /// The Groovy version of [_kotlinReleaseBlock].
+  static const _groovyReleaseBlock =
+      '$_startMarker (generated, edit flavorpilot.yaml instead)\n'
+      '// Release builds use each flavor\'s signing key (see productFlavors).\n'
+      'android.buildTypes.release.signingConfig = null\n'
+      '$_endMarker\n';
+
   /// The flavors block for `build.gradle.kts` (Kotlin DSL).
-  String _kotlinBlock(ProjectConfig config) {
+  String _kotlinBlock(ProjectConfig config, Map<String, String> keys) {
     final buffer = StringBuffer()
       ..writeln('    $_startMarker (generated, edit flavorpilot.yaml instead)')
       // Needed for `resValue` on newer Android Gradle Plugin versions.
       ..writeln('    buildFeatures {')
       ..writeln('        resValues = true')
-      ..writeln('    }')
+      ..writeln('    }');
+    if (keys.isNotEmpty) buffer.write(_kotlinSigning(keys));
+    buffer
       ..writeln('    flavorDimensions += "flavor"')
       ..writeln('    productFlavors {');
     for (final flavor in config.flavors) {
@@ -128,12 +271,17 @@ class AndroidGenerator extends Generator {
           '            applicationId = "${_escape(flavor.androidId!)}"',
         );
       }
-      buffer
-        ..writeln(
-          '            resValue("string", "app_name", '
-          '"${_escape(_appName(flavor))}")',
-        )
-        ..writeln('        }');
+      buffer.writeln(
+        '            resValue("string", "app_name", '
+        '"${_escape(_appName(flavor))}")',
+      );
+      if (keys.isNotEmpty) {
+        buffer.writeln(
+          '            signingConfig = '
+          '${_signingValue(config, flavor, keys, kotlin: true)}',
+        );
+      }
+      buffer.writeln('        }');
     }
     buffer
       ..writeln('    }')
@@ -142,12 +290,14 @@ class AndroidGenerator extends Generator {
   }
 
   /// The flavors block for `build.gradle` (Groovy DSL).
-  String _groovyBlock(ProjectConfig config) {
+  String _groovyBlock(ProjectConfig config, Map<String, String> keys) {
     final buffer = StringBuffer()
       ..writeln('    $_startMarker (generated, edit flavorpilot.yaml instead)')
       ..writeln('    buildFeatures {')
       ..writeln('        resValues true')
-      ..writeln('    }')
+      ..writeln('    }');
+    if (keys.isNotEmpty) buffer.write(_groovySigning(keys));
+    buffer
       ..writeln('    flavorDimensions "flavor"')
       ..writeln('    productFlavors {');
     for (final flavor in config.flavors) {
@@ -159,12 +309,17 @@ class AndroidGenerator extends Generator {
           '            applicationId "${_escape(flavor.androidId!)}"',
         );
       }
-      buffer
-        ..writeln(
-          '            resValue "string", "app_name", '
-          '"${_escape(_appName(flavor))}"',
-        )
-        ..writeln('        }');
+      buffer.writeln(
+        '            resValue "string", "app_name", '
+        '"${_escape(_appName(flavor))}"',
+      );
+      if (keys.isNotEmpty) {
+        buffer.writeln(
+          '            signingConfig '
+          '${_signingValue(config, flavor, keys, kotlin: false)}',
+        );
+      }
+      buffer.writeln('        }');
     }
     buffer
       ..writeln('    }')

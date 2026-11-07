@@ -56,11 +56,16 @@ class BuildCommand extends FlavorPilotCommand {
     final config = loadConfig();
     final flavor = resolveFlavor(config);
     final target = argResults!.option('target')!;
+    final mode = BuildMode.values.byName(argResults!.option('mode')!);
+    if (mode == BuildMode.release &&
+        (target == 'apk' || target == 'appbundle')) {
+      checkSigning(config, flavor, strict: false);
+    }
 
     final args = flutterArgs(
       command: ['build', target],
       flavor: flavor,
-      mode: BuildMode.values.byName(argResults!.option('mode')!),
+      mode: mode,
       entryPoint: config.entryPointFor(flavor),
       extra: [if (splitPerAbi(target)) '--split-per-abi', ...passthroughArgs],
     );

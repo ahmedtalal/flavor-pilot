@@ -93,8 +93,12 @@ class FakeProcessRunner extends ProcessRunner {
   /// Exit code every "run" returns.
   final int exitCode;
 
-  /// Called with Flutter's arguments, e.g. to create a fake build output.
+  /// Called with the program's arguments, e.g. to create a fake build
+  /// output.
   final void Function(List<String> arguments)? onRun;
+
+  /// The environment of every call, in order (null when none was given).
+  final environments = <Map<String, String>?>[];
 
   /// Every command, as `[executable, ...arguments]`.
   final calls = <List<String>>[];
@@ -104,8 +108,10 @@ class FakeProcessRunner extends ProcessRunner {
     String executable,
     List<String> arguments, {
     String? workingDirectory,
+    Map<String, String>? environment,
   }) async {
     calls.add([executable, ...arguments]);
+    environments.add(environment);
     onRun?.call(arguments);
     return exitCode;
   }

@@ -78,9 +78,8 @@ class RemoveCommand extends FlavorPilotCommand {
       );
     }
 
-    final updated = ProjectConfig(
+    final updated = config.copyWith(
       flavors: config.flavors.where((f) => f != flavor).toList(),
-      mainMode: config.mainMode,
     );
 
     // Plan everything before asking, so a problem shows up before the
@@ -89,7 +88,7 @@ class RemoveCommand extends FlavorPilotCommand {
     final removed = _planRemoval(flavor, changes);
     final setup = ProjectSetup(projectDir: projectDir, logger: logger);
     setup.plan(updated, saveConfig: true, changes: changes);
-    final kept = _keptFiles(flavor, config);
+    final kept = _keptFiles(flavor, config, updated);
 
     if (!_confirm(flavor, removed, kept)) {
       logger.info('Nothing was removed.');
@@ -106,10 +105,12 @@ class RemoveCommand extends FlavorPilotCommand {
     for (final path in kept) {
       logger.warn('Kept $path, because it may hold your own work.');
     }
-    if (kept.any((path) => _isEnvFile(flavor, path))) {
+    for (final path in kept.where(
+      (path) => path != config.entryPointFor(flavor),
+    )) {
       logger.warn(
-        '${flavor.envFile} is no longer in .gitignore. Delete it, or move '
-        'its values, before your next commit.',
+        '$path is no longer in .gitignore. Move it somewhere safe outside the '
+        'project (or delete it) before your next commit.',
       );
     }
     logger.info(
@@ -162,13 +163,25 @@ class RemoveCommand extends FlavorPilotCommand {
   }
 
   /// Files of [flavor] that stay because they may hold the developer's work.
-  List<String> _keptFiles(Flavor flavor, ProjectConfig config) {
+  ///
+  /// A signing key only [flavor] used is listed too: keys are never deleted,
+  /// since losing one can block app updates.
+  List<String> _keptFiles(
+    Flavor flavor,
+    ProjectConfig config,
+    ProjectConfig updated,
+  ) {
     final mainFile = config.entryPointFor(flavor);
     final envFile = flavor.envFile;
+    final key = flavor.androidSigning;
+    final keyStillUsed = updated.flavors.any(
+      (f) => updated.signingFor(f) == key,
+    );
     return [
       if (mainFile != null && _exists(mainFile)) mainFile,
       if (envFile != null && _exists(envFile) && !_hasNoValues(envFile))
         envFile,
+      if (key != null && !keyStillUsed && _exists(key)) key,
     ];
   }
 
@@ -207,6 +220,4 @@ class RemoveCommand extends FlavorPilotCommand {
         .map((line) => line.trim())
         .every((line) => line.isEmpty || line.startsWith('#'));
   }
-
-  bool _isEnvFile(Flavor flavor, String path) => path == flavor.envFile;
 }

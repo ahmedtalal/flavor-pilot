@@ -12,6 +12,7 @@ class Flavor {
     this.icon,
     this.env = const {},
     this.envFile,
+    this.androidSigning,
   });
 
   /// The exact name passed to Flutter's `--flavor` flag, e.g. `development`.
@@ -45,11 +46,21 @@ class Flavor {
   /// Flutter with `--dart-define-from-file`.
   final String? envFile;
 
+  /// Path of the `.properties` file with this flavor's Android signing key,
+  /// relative to the project root. Overrides the project-wide
+  /// `android_signing` at the top of `flavorpilot.yaml`. See
+  /// `flavorpilot signing`.
+  final String? androidSigning;
+
   /// Returns true when [input] is this flavor's [name] or [alias].
   bool matches(String input) => input == name || input == alias;
 
-  /// Returns a copy of this flavor with [env] and/or [envFile] replaced.
-  Flavor copyWith({Map<String, Object>? env, String? envFile}) {
+  /// Returns a copy of this flavor with the given fields replaced.
+  Flavor copyWith({
+    Map<String, Object>? env,
+    String? envFile,
+    String? androidSigning,
+  }) {
     return Flavor(
       name: name,
       alias: alias,
@@ -59,6 +70,7 @@ class Flavor {
       icon: icon,
       env: env ?? this.env,
       envFile: envFile ?? this.envFile,
+      androidSigning: androidSigning ?? this.androidSigning,
     );
   }
 
@@ -75,6 +87,7 @@ class Flavor {
       iosBundleId: data['ios_bundle_id'] as String?,
       icon: data['icon'] as String?,
       envFile: data['env_file'] as String?,
+      androidSigning: data['android_signing'] as String?,
       env: {
         for (final entry in (env ?? const {}).entries)
           entry.key.toString(): entry.value as Object,
@@ -95,6 +108,7 @@ class Flavor {
       'ios_bundle_id': ?iosBundleId,
       'icon': ?icon,
       'env_file': ?envFile,
+      'android_signing': ?androidSigning,
     };
   }
 }

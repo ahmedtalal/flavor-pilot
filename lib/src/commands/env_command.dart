@@ -1,5 +1,4 @@
 import '../generators/project_setup.dart';
-import '../models/project_config.dart';
 import '../utils/env_defaults.dart';
 import 'flavorpilot_command.dart';
 
@@ -39,10 +38,10 @@ class EnvCommand extends FlavorPilotCommand {
       return 0;
     }
 
-    ProjectSetup(projectDir: projectDir, logger: logger).apply(
-      ProjectConfig(flavors: flavors, mainMode: config.mainMode),
-      saveConfig: true,
-    );
+    ProjectSetup(
+      projectDir: projectDir,
+      logger: logger,
+    ).apply(config.copyWith(flavors: flavors), saveConfig: true);
     logger.info('Use them in your app: AppFlavor.current.baseUrl');
     warnAboutPlaceholders(flavors);
     return 0;

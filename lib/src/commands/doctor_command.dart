@@ -5,7 +5,9 @@ import 'package:path/path.dart' as p;
 
 import '../generators/project_setup.dart';
 import '../utils/exceptions.dart';
+import '../models/project_config.dart';
 import '../utils/file_changes.dart';
+import '../utils/signing_key.dart';
 import 'flavorpilot_command.dart';
 
 /// `flavorpilot doctor`: checks that every flavor is set up correctly.
@@ -64,6 +66,9 @@ class DoctorCommand extends FlavorPilotCommand {
 
     // Example values don't fail the check: they're fine while developing.
     warnAboutPlaceholders(config.flavors);
+    // A missing key doesn't either: teammates without it can still build
+    // debug and test versions.
+    _warnAboutSigning(config);
 
     if (outdated.isEmpty) {
       logger.success('All flavor files are up to date.');
@@ -76,6 +81,23 @@ class DoctorCommand extends FlavorPilotCommand {
     }
     logger.info('Run `flavorpilot sync` to fix them.');
     return 1;
+  }
+
+  /// Warns about each signing key that would fail a release build.
+  void _warnAboutSigning(ProjectConfig config) {
+    final paths = {for (final f in config.flavors) ?config.signingFor(f)};
+    for (final path in paths) {
+      final key = SigningKey.read(projectDir, path);
+      final problems = key == null
+          ? ['$path was not found.']
+          : key.problems(projectDir);
+      if (problems.isNotEmpty) {
+        logger.warn(
+          'Signing key: ${problems.join(' ')} Release builds that use it '
+          'will fail until it is fixed.',
+        );
+      }
+    }
   }
 
   /// True when the file at [path] already has the [expected] content.

@@ -1,3 +1,15 @@
+## Unreleased
+
+- New `remove` command removes a flavor and everything flavorpilot created
+  for it (Android and iOS setup, scheme, icons, IDE run configurations). It
+  asks for confirmation first (`--yes` skips it) and keeps
+  `lib/main_<flavor>.dart` and `.env` files that hold values.
+- New `signing` command sets up the Android signing key for release builds:
+  one key for every flavor by default, or one per flavor
+  (`flavorpilot signing prod`). It creates the key with `keytool` or uses an
+  existing keystore (`--keystore`), keeps the key files out of Git, and never
+  replaces a key. `release` stops if the key files are missing.
+
 ## 0.4.0
 
 - `build` and `release` accept `--split-per-abi` (shortcuts `--split` and

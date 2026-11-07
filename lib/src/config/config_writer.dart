@@ -13,8 +13,15 @@ class ConfigWriter {
   String toYaml(ProjectConfig config) {
     final buffer = StringBuffer()
       ..writeln('# flavorpilot config. Docs: run `flavorpilot help`.')
-      ..writeln('main_mode: ${config.mainMode.name}')
-      ..writeln('flavors:');
+      ..writeln('main_mode: ${config.mainMode.name}');
+    if (config.androidSigning case final signing?) {
+      buffer
+        ..writeln(
+          '# Android signing key for every flavor. See `flavorpilot signing`.',
+        )
+        ..writeln('android_signing: ${_quote(signing)}');
+    }
+    buffer.writeln('flavors:');
 
     for (final flavor in config.flavors) {
       final fields = flavor.toMap();

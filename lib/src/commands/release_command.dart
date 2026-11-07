@@ -76,6 +76,7 @@ class ReleaseCommand extends FlavorPilotCommand {
     final target = argResults!.option('target')!;
     final bump = VersionBump.values.byName(argResults!.option('bump')!);
     final split = splitPerAbi(target);
+    if (target != 'ipa') checkSigning(config, flavor, strict: true);
     warnAboutPlaceholders([flavor]);
 
     // 1. Bump the version, remembering the original file so it can be put

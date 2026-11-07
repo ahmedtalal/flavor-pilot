@@ -9,6 +9,7 @@ import 'android_generator.dart';
 import 'dart_generator.dart';
 import 'dotenv_generator.dart';
 import 'generator.dart';
+import 'gitignore_generator.dart';
 import 'icon_generator.dart';
 import 'ide_generator.dart';
 import 'ios_generator.dart';
@@ -32,6 +33,7 @@ class ProjectSetup {
     DartGenerator(projectDir: projectDir, logger: logger),
     IdeGenerator(projectDir: projectDir, logger: logger),
     DotenvGenerator(projectDir: projectDir, logger: logger),
+    GitignoreGenerator(projectDir: projectDir, logger: logger),
   ];
 
   /// Works out every file change for [config] without writing anything.

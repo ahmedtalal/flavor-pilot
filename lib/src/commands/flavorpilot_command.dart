@@ -10,6 +10,7 @@ import '../utils/env_defaults.dart';
 import '../utils/exceptions.dart';
 import '../utils/logger.dart';
 import '../utils/process_runner.dart';
+import '../utils/signing_key.dart';
 
 /// Base class for every flavorpilot command.
 ///
@@ -95,6 +96,45 @@ abstract class FlavorPilotCommand extends Command<int> {
       usageException('--split-per-abi only works with --target apk.');
     }
     return split;
+  }
+
+  /// Checks [flavor]'s Android signing key before a release build.
+  ///
+  /// With [strict] (used by `release`), a missing or incomplete key stops the
+  /// build. Otherwise it's a warning: Gradle then falls back to the debug
+  /// key, which is fine for testing but rejected by Google Play.
+  void checkSigning(
+    ProjectConfig config,
+    Flavor flavor, {
+    required bool strict,
+  }) {
+    final path = config.signingFor(flavor);
+    if (path == null) {
+      if (config.usesSigning) {
+        logger.warn(
+          '"${flavor.name}" has no signing key, so its release build uses the '
+          'debug key, which Google Play rejects. Run '
+          '`flavorpilot signing ${flavor.alias ?? flavor.name}` to add one.',
+        );
+      }
+      return;
+    }
+
+    final key = SigningKey.read(projectDir, path);
+    final problems = key == null
+        ? ['$path was not found.']
+        : key.problems(projectDir);
+    if (problems.isEmpty) return;
+    if (strict) {
+      throw FlavorPilotException(
+        'Can\'t sign "${flavor.name}": ${problems.join(' ')} Copy the key '
+        'files from your team, or fix android_signing in flavorpilot.yaml.',
+      );
+    }
+    logger.warn(
+      '"${flavor.name}" will be signed with the debug key: '
+      '${problems.join(' ')}',
+    );
   }
 
   /// Warns about settings in [flavors] that still hold an example value, so
