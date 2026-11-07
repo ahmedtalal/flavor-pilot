@@ -1,4 +1,4 @@
-## Unreleased
+## 0.5.0
 
 - New `remove` command removes a flavor and everything flavorpilot created
   for it (Android and iOS setup, scheme, icons, IDE run configurations). It
