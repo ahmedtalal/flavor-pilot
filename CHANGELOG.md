@@ -1,4 +1,4 @@
-## Unreleased
+## 0.6.0
 
 - `remove` now deletes everything for the flavor, including
   `lib/main_<flavor>.dart` and its `.env` file, even if they were edited. Its
